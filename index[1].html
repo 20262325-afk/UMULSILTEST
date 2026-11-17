@@ -1,0 +1,3225 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>실시간 기상정보 연동 도플러 기상 레이더 시뮬레이터</title>
+  <style>
+    :root {
+      --bg-deep: #050b16;
+      --bg-panel: #0b1528;
+      --bg-card: #101e38;
+      --bg-card-alt: #152647;
+      --border-subtle: rgba(56, 189, 248, 0.2);
+      --border-strong: rgba(56, 189, 248, 0.45);
+      --text-primary: #e2e8f0;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-cyan: #38bdf8;
+      --accent-teal: #2dd4bf;
+      --accent-green: #22c55e;
+      --accent-yellow: #eab308;
+      --accent-orange: #f97316;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Pretendard", "Noto Sans KR", "Segoe UI", Roboto, sans-serif;
+      --font-mono: "JetBrains Mono", "Fira Code", "SFMono-Regular", Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-deep);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* 상단 헤더 */
+    header {
+      background: linear-gradient(180deg, #091326 0%, #060d1b 100%);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 12px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(10px);
+    }
+
+    .header-inner {
+      max-width: 1680px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(45, 212, 191, 0.25) 0%, rgba(15, 23, 42, 0.9) 75%);
+      border: 1.5px solid var(--accent-teal);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow: 0 0 14px rgba(45, 212, 191, 0.3);
+    }
+
+    .brand-icon::after {
+      content: "";
+      width: 8px;
+      height: 8px;
+      background: var(--accent-teal);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent-teal);
+    }
+
+    .brand-title h1 {
+      font-size: 1.12rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #f8fafc;
+    }
+
+    .brand-title p {
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+    }
+
+    .header-status-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .badge-live {
+      background: rgba(34, 197, 94, 0.14);
+      color: #4ade80;
+      border-color: rgba(34, 197, 94, 0.4);
+    }
+
+    .badge-demo {
+      background: rgba(234, 179, 8, 0.14);
+      color: #facc15;
+      border-color: rgba(234, 179, 8, 0.4);
+    }
+
+    .badge-sim {
+      background: rgba(56, 189, 248, 0.14);
+      color: #7dd3fc;
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+
+    .badge-exp {
+      background: rgba(168, 85, 247, 0.16);
+      color: #d8b4fe;
+      border-color: rgba(168, 85, 247, 0.45);
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.82); }
+    }
+
+    .btn {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      background: var(--bg-card-alt);
+      border-color: var(--border-strong);
+    }
+
+    .btn-primary {
+      background: rgba(56, 189, 248, 0.18);
+      border-color: var(--accent-cyan);
+      color: #e0f2fe;
+    }
+
+    .btn-primary:hover {
+      background: rgba(56, 189, 248, 0.3);
+    }
+
+    .btn-teal {
+      background: rgba(45, 212, 191, 0.18);
+      border-color: var(--accent-teal);
+      color: #ccfbf1;
+    }
+
+    .btn-active {
+      background: var(--accent-cyan);
+      color: #04101e;
+      border-color: var(--accent-cyan);
+    }
+
+    /* 데이터 출처 안내 배너 */
+    .disclaimer-bar {
+      background: rgba(15, 23, 42, 0.92);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+      padding: 7px 20px;
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+    }
+
+    .disclaimer-inner {
+      max-width: 1680px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    /* 메인 레이아웃 */
+    .container {
+      max-width: 1680px;
+      margin: 0 auto;
+      padding: 16px 20px 36px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* 탭 네비게이션 */
+    .nav-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 10px;
+    }
+
+    .nav-tab {
+      padding: 8px 16px;
+      border-radius: 8px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-primary);
+      border-color: var(--border-strong);
+    }
+
+    .nav-tab.active {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(45, 212, 191, 0.18));
+      border-color: var(--accent-cyan);
+      color: #ffffff;
+    }
+
+    .tab-section {
+      display: none;
+    }
+
+    .tab-section.active {
+      display: block;
+    }
+
+    /* 기상정보 스트립 */
+    .weather-strip {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .weather-strip-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .location-info {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .location-name {
+      font-size: 1.02rem;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+
+    .coord-pill {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--accent-teal);
+      background: rgba(45, 212, 191, 0.1);
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(45, 212, 191, 0.25);
+    }
+
+    .weather-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+      gap: 8px;
+    }
+
+    .weather-item {
+      background: var(--bg-card);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+
+    .weather-item-label {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .weather-item-value {
+      font-family: var(--font-mono);
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .weather-item-sub {
+      font-size: 0.69rem;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    /* 시간대별 강수 예보 바 */
+    .hourly-forecast {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .hour-card {
+      min-width: 82px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(56, 189, 248, 0.15);
+      border-radius: 8px;
+      padding: 6px 8px;
+      text-align: center;
+      font-size: 0.74rem;
+    }
+
+    .hour-card .h-time {
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+    }
+
+    .hour-card .h-pop {
+      color: var(--accent-cyan);
+      font-weight: 700;
+      font-family: var(--font-mono);
+      margin: 2px 0;
+    }
+
+    .hour-card .h-pcp {
+      color: var(--text-muted);
+      font-size: 0.7rem;
+    }
+
+    /* 워크스테이션 메인 3단 그리드 */
+    .workstation-grid {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr 0.95fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    @media (max-width: 1340px) {
+      .workstation-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .controls-column {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .workstation-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+      padding-bottom: 10px;
+    }
+
+    .panel-title {
+      font-size: 0.96rem;
+      font-weight: 700;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .radar-mode-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .mode-btn {
+      padding: 4px 9px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      border-radius: 6px;
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      cursor: pointer;
+    }
+
+    .mode-btn.active {
+      background: rgba(45, 212, 191, 0.22);
+      color: #ccfbf1;
+      border-color: var(--accent-teal);
+    }
+
+    .canvas-wrapper {
+      position: relative;
+      width: 100%;
+      background: #030711;
+      border-radius: 10px;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .radar-canvas-box {
+      aspect-ratio: 1 / 1;
+      max-height: 560px;
+      margin: 0 auto;
+      cursor: crosshair;
+    }
+
+    .canvas-overlay-tag {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(5, 11, 22, 0.82);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      color: #cbd5e1;
+      pointer-events: none;
+    }
+
+    .canvas-overlay-bottom {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      right: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+      font-size: 0.71rem;
+      color: var(--text-secondary);
+    }
+
+    /* 범례 바 */
+    .legend-box {
+      background: var(--bg-card);
+      border-radius: 8px;
+      padding: 8px 12px;
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      font-size: 0.75rem;
+    }
+
+    .legend-bar {
+      height: 10px;
+      border-radius: 5px;
+      margin: 6px 0 4px;
+    }
+
+    .legend-vel {
+      background: linear-gradient(90deg, #00e676 0%, #2dd4bf 32%, #94a3b8 50%, #fb923c 68%, #ef4444 100%);
+    }
+
+    .legend-dbz {
+      background: linear-gradient(90deg, #38bdf8 0%, #22c55e 28%, #eab308 55%, #f97316 78%, #ef4444 92%, #d946ef 100%);
+    }
+
+    .legend-labels {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+
+    /* 도플러 물리 시각화 단계 카드 */
+    .doppler-steps {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+    }
+
+    @media (max-width: 600px) {
+      .doppler-steps {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .step-chip {
+      background: var(--bg-card);
+      border: 1px solid rgba(56, 189, 248, 0.18);
+      border-radius: 7px;
+      padding: 6px 7px;
+      font-size: 0.7rem;
+      transition: all 0.2s;
+    }
+
+    .step-chip.active-step {
+      border-color: var(--accent-teal);
+      background: rgba(45, 212, 191, 0.14);
+      box-shadow: 0 0 10px rgba(45, 212, 191, 0.18);
+    }
+
+    .step-chip strong {
+      display: block;
+      color: var(--accent-cyan);
+      font-size: 0.72rem;
+      margin-bottom: 2px;
+    }
+
+    .formula-banner {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+      align-items: center;
+      gap: 10px;
+      background: rgba(16, 30, 56, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }
+
+    .formula-item span {
+      color: var(--accent-teal);
+      font-weight: 700;
+    }
+
+    /* 물리 분석 대시보드 수치 카드 */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 8px;
+      padding: 9px 11px;
+    }
+
+    .metric-card.highlight-approach {
+      border-color: rgba(34, 197, 94, 0.55);
+      background: rgba(34, 197, 94, 0.08);
+    }
+
+    .metric-card.highlight-recede {
+      border-color: rgba(239, 68, 68, 0.55);
+      background: rgba(239, 68, 68, 0.08);
+    }
+
+    .metric-label {
+      font-size: 0.73rem;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .metric-val {
+      font-family: var(--font-mono);
+      font-size: 1.04rem;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-top: 3px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-sub {
+      font-family: var(--font-mono);
+      font-size: 0.71rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* 조작 패널 슬라이더 */
+    .mode-switch-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      background: #060d1b;
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .sim-mode-btn {
+      padding: 7px 10px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.79rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .sim-mode-btn.active {
+      background: var(--bg-card-alt);
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border-strong);
+    }
+
+    .control-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .control-group {
+      background: var(--bg-card);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 8px;
+      padding: 8px 11px;
+    }
+
+    .control-group.locked {
+      opacity: 0.72;
+    }
+
+    .control-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+      font-size: 0.78rem;
+    }
+
+    .control-top label {
+      color: #e2e8f0;
+      font-weight: 600;
+    }
+
+    .control-inputs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent-cyan);
+      cursor: pointer;
+      height: 5px;
+    }
+
+    input[type="number"].num-box {
+      width: 74px;
+      background: #060d1b;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 5px;
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      padding: 3px 6px;
+      text-align: right;
+    }
+
+    .unit-tag {
+      font-family: var(--font-mono);
+      font-size: 0.73rem;
+      color: var(--text-secondary);
+      min-width: 32px;
+    }
+
+    .preset-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .preset-btn {
+      flex: 1;
+      padding: 3px 6px;
+      font-size: 0.7rem;
+      font-family: var(--font-mono);
+      background: #071022;
+      color: var(--accent-cyan);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .preset-btn:hover {
+      background: rgba(56, 189, 248, 0.18);
+    }
+
+    /* 그래프 그리드 */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* 학습 모듈 스타일 */
+    .edu-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .level-toggle {
+      display: inline-flex;
+      background: #060d1b;
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .level-btn {
+      padding: 6px 14px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .level-btn.active {
+      background: var(--accent-cyan);
+      color: #04101e;
+    }
+
+    .edu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 14px;
+    }
+
+    .edu-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .edu-card h3 {
+      font-size: 0.96rem;
+      color: var(--accent-teal);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .edu-card p {
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      line-height: 1.65;
+    }
+
+    .edu-formula {
+      background: #060d1b;
+      border-left: 3px solid var(--accent-cyan);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #7dd3fc;
+      border-radius: 0 6px 6px 0;
+    }
+
+    /* 실제 레이더 비교 표 */
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      padding: 10px 12px;
+      text-align: left;
+    }
+
+    .comparison-table th {
+      background: var(--bg-card-alt);
+      color: var(--accent-cyan);
+    }
+
+    .comparison-table tr:nth-child(even) {
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    /* 모달 */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 15, 0.82);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-strong);
+      border-radius: 14px;
+      max-width: 560px;
+      width: 100%;
+      padding: 22px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-box h2 {
+      font-size: 1.1rem;
+      color: #f8fafc;
+    }
+
+    .modal-box p, .modal-box li {
+      font-size: 0.84rem;
+      color: #cbd5e1;
+      line-height: 1.6;
+    }
+
+    .modal-box ul {
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .form-field label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent-cyan);
+    }
+
+    .text-input, .select-input {
+      background: #060d1b;
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: #f8fafc;
+      font-size: 0.85rem;
+      width: 100%;
+    }
+
+    .modal-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .info-callout {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.79rem;
+      color: #bae6fd;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 상단 헤더 -->
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true"></div>
+        <div class="brand-title">
+          <h1>도플러 기상 레이더 물리 시뮬레이터</h1>
+          <p>실시간 기상정보 연동 · 전자기파 산란 · 도플러 주파수 편이 및 시선속도장 분석</p>
+        </div>
+      </div>
+
+      <div class="header-status-group">
+        <span id="weatherSourceBadge" class="badge badge-demo">
+          <span class="dot"></span>
+          <span id="weatherSourceText">데모 모드 (예시 기상 데이터)</span>
+        </span>
+        <span id="simModeBadge" class="badge badge-sim">
+          <span id="simModeText">기상정보 연동 모드</span>
+        </span>
+        <button class="btn" id="btnOpenLocation" title="위치 변경 및 지역 검색">📍 위치·지역 설정</button>
+        <button class="btn" id="btnOpenApi" title="기상청 API 인증키 설정">🔑 기상청 API 설정</button>
+        <button class="btn btn-primary" id="btnTogglePlay">⏸ 일시정지</button>
+        <button class="btn" id="btnReset">↺ 초기화</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 데이터 구분 고지 바 -->
+  <div class="disclaimer-bar">
+    <div class="disclaimer-inner">
+      <div>
+        <strong>[관측·모의 데이터 구분 고지]</strong>
+        레이더의 강수 분포 및 에코 강도는 실제 기상청 레이더(RDR) 원시 반사도 관측자료가 아니라, 기상청 실황/예보(또는 데모) 데이터를 초기 조건으로 생성한 <strong>물리 교육용 모의 표현</strong>입니다.
+      </div>
+      <div id="lastUpdateText" style="font-family: var(--font-mono); color: var(--accent-teal);">
+        기준 시각: 초기화 대기
+      </div>
+    </div>
+  </div>
+
+  <!-- 메인 컨테이너 -->
+  <div class="container">
+    <!-- 상단 탭 메뉴 -->
+    <div class="nav-tabs" role="tablist">
+      <button class="nav-tab active" data-tab="simulatorTab">📡 도플러 레이더 &amp; 물리 시뮬레이터</button>
+      <button class="nav-tab" data-tab="educationTab">📚 과학 학습 모듈 (고교 물리 · 대학 전자기/기상학)</button>
+      <button class="nav-tab" data-tab="differenceTab">🔬 실제 기상 레이더와의 차이 및 데이터 검증</button>
+    </div>
+
+    <!-- ==================== 탭 1: 메인 시뮬레이터 ==================== -->
+    <div id="simulatorTab" class="tab-section active">
+      <!-- 현재 위치 기상정보 스트립 -->
+      <section class="weather-strip" aria-label="현재 지역 기상정보">
+        <div class="weather-strip-header">
+          <div class="location-info">
+            <span class="location-name" id="displayRegionName">📍 강원특별자치도 춘천시 (기본 관측소)</span>
+            <span class="coord-pill" id="displayGridInfo">위·경도: 37.88°N, 127.73°E | KMA 격자: NX 73, NY 134</span>
+            <span id="weatherDetailNote" style="font-size: 0.76rem; color: var(--text-secondary);">
+              ※ 개인정보 보호를 위해 상세 주소는 표시하지 않고 시·군·구 단위만 표기합니다.
+            </span>
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button class="btn btn-teal" id="btnSyncWeatherToSim">⬇ 현재 기상값을 시뮬레이션에 반영</button>
+            <button class="btn" id="btnRefreshWeather">🔄 기상정보 새로고침</button>
+          </div>
+        </div>
+
+        <!-- 8개 주요 기상 항목 -->
+        <div class="weather-grid">
+          <div class="weather-item">
+            <div class="weather-item-label"><span>현재 기온</span><span id="tagTemp">데모</span></div>
+            <div class="weather-item-value" id="valTemp">12.4 °C</div>
+            <div class="weather-item-sub">기상청 T1H</div>
+          </div>
+          <div class="weather-item">
+            <div class="weather-item-label"><span>현재 풍향</span><span id="tagWindDir">데모</span></div>
+            <div class="weather-item-value" id="valWindDir">270° (서풍)</div>
+            <div class="weather-item-sub">바람이 불어오는 방향</div>
+          </div>
+          <div class="weather-item">
+            <div class="weather-item-label"><span>현재 풍속</span><span id="tagWindSpd">데모</span></div>
+            <div class="weather-item-value" id="valWindSpd">6.5 m/s</div>
+            <div class="weather-item-sub">기상청 WSD</div>
+          </div>
+          <div class="weather-item">
+            <div class="weather-item-label"><span>강수 형태</span><span id="tagPty">데모</span></div>
+            <div class="weather-item-value" id="valPty">비 (Rain)</div>
+            <div class="weather-item-sub">기상청 PTY</div>
+          </div>
+          <div class="weather-item">
+            <div class="weather-item-label"><span>1시간 강수량</span><span id="tagRn1">데모</span></div>
+            <div class="weather-item-value" id="valRn1">4.5 mm</div>
+            <div class="weather-item-sub">기상청 RN1/PCP</div>
+          </div>
+          <div class="weather-item">
+            <div class="weather-item-label"><span>강수확률</span><span id="tagPop">데모</span></div>
+            <div class="weather-item-value" id="valPop">70 %</div>
+            <div class="weather-item-sub">단기예보 POP (반사도와 별개)</div>
+          </div>
+          <div class="weather-item">
+            <div class="weather-item-label"><span>상대습도</span><span id="tagReh">데모</span></div>
+            <div class="weather-item-value" id="valReh">82 %</div>
+            <div class="weather-item-sub">기상청 REH</div>
+          </div>
+          <div class="weather-item">
+            <div class="weather-item-label"><span>현지 기압</span><span id="tagPres">미제공/모의</span></div>
+            <div class="weather-item-value" id="valPres">미제공 (N/A)</div>
+            <div class="weather-item-sub" id="subPres">초단기실황 API 미포함 항목</div>
+          </div>
+        </div>
+
+        <!-- 9. 시간대별 강수 예보 -->
+        <div>
+          <div style="font-size: 0.76rem; color: var(--text-secondary); margin-bottom: 6px; display: flex; justify-content: space-between;">
+            <span><strong>시간대별 강수 예보 (향후 8시간)</strong> — 강수확률(POP) 및 예상 강수량</span>
+            <span id="forecastSourceNote" style="color: var(--text-muted);">출처: 예시 데모 예보 시퀀스</span>
+          </div>
+          <div class="hourly-forecast" id="hourlyForecastList"></div>
+        </div>
+      </section>
+
+      <!-- 메인 3열 워크스테이션 -->
+      <div class="workstation-grid" style="margin-top: 16px;">
+
+        <!-- 좌측 열: 메인 PPI 도플러 기상 레이더 -->
+        <section class="panel" aria-label="도플러 기상 레이더 PPI 화면">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>🎯 PPI 도플러 기상 레이더 화면</span>
+            </div>
+            <div class="radar-mode-buttons">
+              <button class="mode-btn active" data-radarmode="hybrid">복합 (속도장+파동)</button>
+              <button class="mode-btn" data-radarmode="velocity">도플러 시선속도장</button>
+              <button class="mode-btn" data-radarmode="reflectivity">모의 반사도(강수강도)</button>
+            </div>
+          </div>
+
+          <div class="canvas-wrapper radar-canvas-box">
+            <canvas id="radarCanvas" width="620" height="620"></canvas>
+            <div class="canvas-overlay-tag" id="radarTopTag">
+              관측반경: 100 km | 회전: 4.0 RPM | 🖱 강수셀 드래그 이동 가능
+            </div>
+            <div class="canvas-overlay-bottom">
+              <span>※ 예보 기반 모의 분포 (실제 레이더 원시자료 아님)</span>
+              <span id="radarCursorInfo">방위: --° | 거리: -- km</span>
+            </div>
+          </div>
+
+          <!-- 범례 -->
+          <div class="legend-box" id="legendVelocityBox">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong>도플러 시선속도장 범례 (Radial Velocity, v<sub>r</sub>)</strong>
+              <span style="color: var(--text-secondary); font-size: 0.71rem;">0 등속선(회색): 레이더 시선과 직각 이동</span>
+            </div>
+            <div class="legend-bar legend-vel"></div>
+            <div class="legend-labels">
+              <span style="color: #4ade80;">◀ 접근 (-30 m/s, 초록)</span>
+              <span>0 m/s (중립/직각)</span>
+              <span style="color: #f87171;">후퇴 (+30 m/s, 빨강) ▶</span>
+            </div>
+          </div>
+
+          <div class="legend-box" id="legendReflectivityBox" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong>모의 강수 에코 강도 범례 (Simulated dBZ)</strong>
+              <span style="color: var(--text-secondary); font-size: 0.71rem;">강수량·강수확률 기반 모의 분포</span>
+            </div>
+            <div class="legend-bar legend-dbz"></div>
+            <div class="legend-labels">
+              <span>약함 (15 dBZ)</span>
+              <span>보통 (30 dBZ)</span>
+              <span>강함 (45 dBZ)</span>
+              <span>매우 강함 (60+ dBZ)</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 중앙 열: 도플러 효과 물리 파동 시뮬레이션 & 실시간 그래프 -->
+        <section class="panel" aria-label="도플러 효과 파동 시각화 및 그래프">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>〰️ 도플러 효과 전자기파 송·수신 물리 시뮬레이터</span>
+            </div>
+            <span class="badge badge-sim" id="dopplerStateBadge">접근 중 (주파수 증가)</span>
+          </div>
+
+          <!-- 5단계 물리 과정 인디케이터 -->
+          <div class="doppler-steps">
+            <div class="step-chip active-step" id="step1">
+              <strong>① 전자기파 방출</strong>
+              송신 주파수 f₀ 방출
+            </div>
+            <div class="step-chip" id="step2">
+              <strong>② 입자 도달</strong>
+              전파가 강수입자 도달
+            </div>
+            <div class="step-chip" id="step3">
+              <strong>③ 후방 산란</strong>
+              움직이는 입자서 반사
+            </div>
+            <div class="step-chip" id="step4">
+              <strong>④ 주파수 편이</strong>
+              파장 압축·신장 발생
+            </div>
+            <div class="step-chip" id="step5">
+              <strong>⑤ 시선속도 산출</strong>
+              Δf 분석으로 v<sub>r</sub> 계산
+            </div>
+          </div>
+
+          <!-- 전자기파 & 파형 비교 캔버스 -->
+          <div class="canvas-wrapper">
+            <canvas id="waveCanvas" width="560" height="310"></canvas>
+            <div class="canvas-overlay-tag" id="waveOverlayTag">
+              송신파(청록) vs 반사파(초록/빨강) 파장 간격 실시간 비교
+            </div>
+          </div>
+
+          <!-- 핵심 물리 공식 배너 -->
+          <div class="formula-banner">
+            <div class="formula-item">파장: <span>λ = c / f₀</span></div>
+            <div class="formula-item">도플러 편이: <span>Δf = 2v<sub>r</sub> / λ</span></div>
+            <div class="formula-item">시선속도: <span>v<sub>r</sub> = v · cos(α)</span></div>
+          </div>
+
+          <!-- 실시간 그래프 2종 -->
+          <div class="charts-grid">
+            <div class="canvas-wrapper">
+              <canvas id="freqChartCanvas" width="270" height="155"></canvas>
+            </div>
+            <div class="canvas-wrapper">
+              <canvas id="velChartCanvas" width="270" height="155"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- 우측 열: 물리 분석 대시보드 & 사용자 조작 패널 -->
+        <section class="panel controls-column" aria-label="물리 분석 대시보드 및 변수 조작">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>📊 실시간 물리량 분석 &amp; 실험 제어</span>
+            </div>
+          </div>
+
+          <!-- 실시간 물리량 대시보드 -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label"><span>송신 주파수 (f₀)</span><span>Tx</span></div>
+              <div class="metric-val" id="outF0">2.800000 GHz</div>
+              <div class="metric-sub" id="outF0Hz">2,800,000,000 Hz</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label"><span>수신 주파수 (f<sub>rx</sub>)</span><span>Rx</span></div>
+              <div class="metric-val" id="outFrx">2.800000 GHz</div>
+              <div class="metric-sub" id="outFrxOffset">f₀ + 0.0 Hz</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label"><span>전자기파 파장 (λ)</span><span>c / f₀</span></div>
+              <div class="metric-val" id="outLambda">10.71 cm</div>
+              <div class="metric-sub" id="outLambdaM">0.107069 m (S-Band)</div>
+            </div>
+            <div class="metric-card" id="cardDeltaF">
+              <div class="metric-label"><span>도플러 주파수 변화 (Δf)</span><span>2v<sub>r</sub> / λ</span></div>
+              <div class="metric-val" id="outDeltaF">+0.0 Hz</div>
+              <div class="metric-sub" id="outDeltaFDesc">정지 또는 직각 이동</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label"><span>강수 입자 전체 속도 (|v|)</span><span>실제 이동속력</span></div>
+              <div class="metric-val" id="outTotalSpeed">6.50 m/s</div>
+              <div class="metric-sub" id="outTotalSpeedKmh">23.4 km/h</div>
+            </div>
+            <div class="metric-card" id="cardRadialVel">
+              <div class="metric-label"><span>레이더 시선속도 (v<sub>r</sub>)</span><span>레이더 방향 성분</span></div>
+              <div class="metric-val" id="outRadialVel">0.00 m/s</div>
+              <div class="metric-sub" id="outRadialVelDesc">레이더 관측 성분</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label"><span>입자 이동 방향 (향방)</span><span>바람과 반대</span></div>
+              <div class="metric-val" id="outMoveDir">90° (동진)</div>
+              <div class="metric-sub" id="outBeamAngle">레이더 시선각 α: 90°</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label"><span>현재 풍향 · 풍속</span><span>기상 기준</span></div>
+              <div class="metric-val" id="outWindSummary">270° · 6.5 m/s</div>
+              <div class="metric-sub" id="outWindText">서풍 (서→동 이동)</div>
+            </div>
+          </div>
+
+          <!-- 실험 모드 / 기상 연동 모드 전환 -->
+          <div class="mode-switch-bar">
+            <button class="sim-mode-btn active" id="btnModeWeather">🌤 실제/데모 기상 연동 모드</button>
+            <button class="sim-mode-btn" id="btnModeExperiment">🧪 사용자 물리 실험 모드</button>
+          </div>
+          <div id="modeHelperText" style="font-size: 0.74rem; color: var(--text-secondary);">
+            현재 기상 데이터의 풍향·풍속이 강수 입자 운동에 자동 적용됩니다. 슬라이더를 움직이면 즉시 <strong>물리 실험 모드</strong>로 전환됩니다.
+          </div>
+
+          <!-- 8개 사용자 조작 슬라이더 -->
+          <div class="control-list">
+            <!-- 1. 강수 입자 이동속도 -->
+            <div class="control-group">
+              <div class="control-top">
+                <label for="sliderSpeed">1. 강수 입자 이동속도 (|v|)</label>
+                <span class="badge badge-exp" style="padding: 1px 6px; font-size: 0.67rem;">실험 변수</span>
+              </div>
+              <div class="control-inputs">
+                <input type="range" id="sliderSpeed" min="0" max="50" step="0.5" value="6.5" />
+                <input type="number" class="num-box" id="numSpeed" min="0" max="50" step="0.5" value="6.5" />
+                <span class="unit-tag">m/s</span>
+              </div>
+            </div>
+
+            <!-- 2. 강수 입자 이동 방향 -->
+            <div class="control-group">
+              <div class="control-top">
+                <label for="sliderMoveDir">2. 강수 입자 이동 방향 (목표 방위)</label>
+                <span id="labelWindEquivalent" style="font-size: 0.71rem; color: var(--text-secondary);">풍향 270°(서풍)</span>
+              </div>
+              <div class="control-inputs">
+                <input type="range" id="sliderMoveDir" min="0" max="359" step="1" value="90" />
+                <input type="number" class="num-box" id="numMoveDir" min="0" max="359" step="1" value="90" />
+                <span class="unit-tag">deg</span>
+              </div>
+            </div>
+
+            <!-- 3. 레이더 송신 주파수 -->
+            <div class="control-group">
+              <div class="control-top">
+                <label for="sliderFreq">3. 레이더 송신 주파수 (f₀)</label>
+                <span id="labelBandName" style="font-size: 0.71rem; color: var(--accent-teal);">S-밴드 (기상관측 표준)</span>
+              </div>
+              <div class="control-inputs">
+                <input type="range" id="sliderFreq" min="1.0" max="12.0" step="0.1" value="2.8" />
+                <input type="number" class="num-box" id="numFreq" min="1.0" max="12.0" step="0.1" value="2.8" />
+                <span class="unit-tag">GHz</span>
+              </div>
+              <div class="preset-row">
+                <button type="button" class="preset-btn" data-freq="2.8">S-Band (2.8GHz)</button>
+                <button type="button" class="preset-btn" data-freq="5.6">C-Band (5.6GHz)</button>
+                <button type="button" class="preset-btn" data-freq="9.4">X-Band (9.4GHz)</button>
+              </div>
+            </div>
+
+            <!-- 4. 레이더 관측 거리 -->
+            <div class="control-group">
+              <div class="control-top">
+                <label for="sliderMaxRange">4. 레이더 최대 관측 거리 (R<sub>max</sub>)</label>
+              </div>
+              <div class="control-inputs">
+                <input type="range" id="sliderMaxRange" min="30" max="250" step="5" value="100" />
+                <input type="number" class="num-box" id="numMaxRange" min="30" max="250" step="5" value="100" />
+                <span class="unit-tag">km</span>
+              </div>
+            </div>
+
+            <!-- 5. 강수 영역 크기 -->
+            <div class="control-group">
+              <div class="control-top">
+                <label for="sliderCellRadius">5. 강수 영역의 크기 (반경)</label>
+              </div>
+              <div class="control-inputs">
+                <input type="range" id="sliderCellRadius" min="8" max="65" step="1" value="26" />
+                <input type="number" class="num-box" id="numCellRadius" min="8" max="65" step="1" value="26" />
+                <span class="unit-tag">km</span>
+              </div>
+            </div>
+
+            <!-- 6. 강수 영역 위치 (거리 및 방위각) -->
+            <div class="control-group">
+              <div class="control-top">
+                <label>6. 강수 영역 중심 위치 (레이더 기준 거리 · 방위)</label>
+              </div>
+              <div class="control-inputs" style="margin-bottom: 6px;">
+                <span style="font-size: 0.72rem; color: var(--text-secondary); min-width: 32px;">거리</span>
+                <input type="range" id="sliderCellDist" min="10" max="220" step="1" value="48" />
+                <input type="number" class="num-box" id="numCellDist" min="10" max="220" step="1" value="48" />
+                <span class="unit-tag">km</span>
+              </div>
+              <div class="control-inputs">
+                <span style="font-size: 0.72rem; color: var(--text-secondary); min-width: 32px;">방위</span>
+                <input type="range" id="sliderCellAz" min="0" max="359" step="1" value="270" />
+                <input type="number" class="num-box" id="numCellAz" min="0" max="359" step="1" value="270" />
+                <span class="unit-tag">deg</span>
+              </div>
+            </div>
+
+            <!-- 7. 레이더 회전 속도 -->
+            <div class="control-group">
+              <div class="control-top">
+                <label for="sliderRpm">7. 레이더 안테나 회전 속도</label>
+              </div>
+              <div class="control-inputs">
+                <input type="range" id="sliderRpm" min="0" max="15" step="0.5" value="4.0" />
+                <input type="number" class="num-box" id="numRpm" min="0" max="15" step="0.5" value="4.0" />
+                <span class="unit-tag">RPM</span>
+              </div>
+            </div>
+
+            <!-- 8. 입자 이동 방향과 레이더 시선 사이 각도 -->
+            <div class="control-group">
+              <div class="control-top">
+                <label for="sliderRelAngle">8. 입자 이동 방향과 레이더 시선 사이 각도 (α)</label>
+                <span style="font-size: 0.7rem; color: var(--accent-teal);">180°:정면접근 / 0°:정면후퇴</span>
+              </div>
+              <div class="control-inputs">
+                <input type="range" id="sliderRelAngle" min="0" max="180" step="1" value="180" />
+                <input type="number" class="num-box" id="numRelAngle" min="0" max="180" step="1" value="180" />
+                <span class="unit-tag">deg</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- ==================== 탭 2: 과학적 설명 및 학습 모듈 ==================== -->
+    <div id="educationTab" class="tab-section">
+      <div class="panel">
+        <div class="edu-header">
+          <div>
+            <h2 style="font-size: 1.12rem; color: #f8fafc;">📚 도플러 기상 레이더 핵심 물리학 · 기상학 학습 모듈</h2>
+            <p style="font-size: 0.82rem; color: var(--text-secondary);">
+              고등학교 물리학의 파동·도플러 효과 개념부터 대학 전자기학 및 레이더 기상학의 심화 원리까지 단계별로 학습할 수 있습니다.
+            </p>
+          </div>
+          <div class="level-toggle">
+            <button class="level-btn active" id="btnLevelHS">고등학교 물리학 수준</button>
+            <button class="level-btn" id="btnLevelUniv">대학 전자기학 · 기상학 심화</button>
+          </div>
+        </div>
+
+        <div class="edu-grid" id="eduCardsContainer"></div>
+      </div>
+    </div>
+
+    <!-- ==================== 탭 3: 실제 기상 레이더와의 차이 ==================== -->
+    <div id="differenceTab" class="tab-section">
+      <div class="panel">
+        <h2 style="font-size: 1.12rem; color: #f8fafc;">🔬 실제 기상청 레이더 관측자료와 본 교육용 시뮬레이터의 차이</h2>
+        <p style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.65;">
+          본 프로그램은 기상학 및 물리학 교육 목적의 시뮬레이터입니다. 실제 기상청(KMA) 기상 레이더 관측망의 원시 신호 처리 자료와 본 시뮬레이터의 데이터 생성 방식을 아래와 같이 명확히 구분하여 이해해야 합니다.
+        </p>
+
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>구분 항목</th>
+              <th>실제 기상청(KMA) 도플러 기상 레이더</th>
+              <th>본 교육용 도플러 레이더 시뮬레이터</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>강수 분포 데이터 출처</strong></td>
+              <td>관악산·백령도·광덕산 등 전국 레이더 사이트에서 수평·수직 편파 전파를 발사하여 직접 수신한 3차원 볼륨 반사도(dBZ) 관측자료</td>
+              <td>기상청 단기예보/초단기실황 API(또는 데모 데이터)의 강수량·강수확률·풍향·풍속을 초기 조건으로 생성한 <strong>모의 강수 분포</strong></td>
+            </tr>
+            <tr>
+              <td><strong>강수확률(POP)의 의미</strong></td>
+              <td>레이더는 강수확률을 측정하지 않으며, 대기 중 수상체(빗방울·눈송이)의 크기와 수밀도에 비례하는 반사도 인자(Z)를 관측함</td>
+              <td>예보의 강수확률과 강수량을 시각적 에코 크기 및 입자 밀도 설정에 참고하되, 물리적 반사도와 동일한 물리량이 아님을 명시함</td>
+            </tr>
+            <tr>
+              <td><strong>도플러 속도 계산 방식</strong></td>
+              <td>수천 개의 펄스 쌍(Pulse-Pair) 간 위상차(Δφ)와 스펙트럼 모멘트를 고속 푸리에 변환(FFT)으로 통계 처리하여 시선속도 산출</td>
+              <td>사용자가 설정하거나 기상 데이터에서 연동된 입자 속도(v)와 시선각(α)에 대해 물리 공식 <code>λ = c/f₀</code>, <code>Δf = 2v<sub>r</sub>/λ</code>를 엄밀히 적용하여 실시간 계산</td>
+            </tr>
+            <tr>
+              <td><strong>관측 범위 및 한계 요소</strong></td>
+              <td>지구 곡률에 따른 빔 고도 상승, 지형 클러터(산악 반사), 밝은 띠(융해층), 나이퀴스트 속도 접힘(Velocity Folding) 현상 존재</td>
+              <td>도플러 효과와 시선속도 벡터 분해(v<sub>r</sub> = v·cos α)의 순수 물리 원리를 직관적으로 관찰할 수 있도록 이상화된 2차원 평면으로 구현</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="info-callout">
+          <strong>실제 기상 레이더 관측 영상 확인 안내:</strong> 실제 기상청 레이더 합성 영상(전국 강수 에코 및 바람 벡터)은 기상청 날씨누리(<code>weather.go.kr</code>) 또는 공공데이터포털의 「기상청_레이더 영상 조회서비스」에서 별도의 레이더 이미지 API를 통해 열람할 수 있습니다.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 모달 1: 초기 위치정보 동의 및 지역 설정 ==================== -->
+  <div class="modal-backdrop open" id="locationModal" role="dialog" aria-modal="true" aria-labelledby="locModalTitle">
+    <div class="modal-box">
+      <h2 id="locModalTitle">📍 위치정보 사용 동의 및 관측 기준 지역 설정</h2>
+      <p>
+        현재 위치 기반의 실시간 기상정보(기온, 풍향, 풍속, 강수 형태 등)를 불러와 도플러 기상 레이더 시뮬레이션의 초기 조건으로 활용합니다.
+      </p>
+      <div class="info-callout">
+        <strong>🔒 개인정보 보호 원칙:</strong> 브라우저에서 확인된 위·경도는 기상청 격자 좌표(NX, NY) 변환 및 기상 조회에만 사용되며, 화면에는 상세 주소 없이 <strong>시·군·구 단위</strong>만 표시됩니다.
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button class="btn btn-primary" id="btnAgreeGeo" style="justify-content: center; padding: 10px;">
+          ✅ 위치정보 제공 동의 및 현재 위치로 기상 불러오기
+        </button>
+        <div id="geoStatusMsg" style="font-size: 0.78rem; color: var(--accent-teal);"></div>
+      </div>
+
+      <hr style="border: none; border-top: 1px solid rgba(148,163,184,0.2);" />
+
+      <div class="form-field">
+        <label for="regionSelect">위치정보 거부 시: 시·군·구 직접 선택</label>
+        <select id="regionSelect" class="select-input"></select>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <div class="form-field">
+          <label for="inputLat">또는 위도 (Latitude, °N)</label>
+          <input type="number" id="inputLat" class="text-input" step="0.01" min="32" max="40" value="37.88" />
+        </div>
+        <div class="form-field">
+          <label for="inputLon">경도 (Longitude, °E)</label>
+          <input type="number" id="inputLon" class="text-input" step="0.01" min="124" max="132" value="127.73" />
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-teal" id="btnApplyManualLocation">선택한 지역/좌표로 시작하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 모달 2: 기상청 API 인증키 설정 ==================== -->
+  <div class="modal-backdrop" id="apiModal" role="dialog" aria-modal="true" aria-labelledby="apiModalTitle">
+    <div class="modal-box">
+      <h2 id="apiModalTitle">🔑 기상청(KMA) 공식 단기예보 API 인증키 설정</h2>
+      <p>
+        실제 기상청 관측(초단기실황) 및 예보(단기예보) 데이터를 연동하려면 공공데이터포털에서 발급받은 본인의 인증키가 필요합니다. 본 프로그램에는 임의의 가짜 인증키가 포함되어 있지 않습니다.
+      </p>
+
+      <div class="info-callout">
+        <strong>공공데이터포털 API 발급 및 설정 방법:</strong>
+        <ul>
+          <li>1. <strong>공공데이터포털(data.go.kr)</strong> 회원가입 및 로그인</li>
+          <li>2. <strong>「기상청_단기예보 ((구)_동네예보) 조회서비스」</strong> 활용신청 (자동승인)</li>
+          <li>3. 마이페이지 → 인증키 발급현황에서 <strong>일반 인증키(Encoding 또는 Decoding)</strong> 복사</li>
+          <li>4. 아래 입력창에 붙여넣고 저장 (브라우저 로컬 저장소에만 보관됨)</li>
+          <li>※ 주의: 로컬 파일(<code>file://</code>) 환경에서 브라우저 보안(CORS) 정책으로 외부 API 호출이 차단될 경우 자동으로 안전하게 <strong>데모 모드</strong>로 전환됩니다.</li>
+        </ul>
+      </div>
+
+      <div class="form-field">
+        <label for="kmaApiKeyInput">기상청 API 인증키 (ServiceKey)</label>
+        <input type="text" id="kmaApiKeyInput" class="text-input" placeholder="공공데이터포털에서 발급받은 인증키를 입력하세요 (미입력 시 데모 모드)" />
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" id="btnClearApiKey">인증키 삭제 (데모 모드)</button>
+        <button class="btn" id="btnCloseApiModal">닫기</button>
+        <button class="btn btn-primary" id="btnSaveApiKey">저장 및 기상정보 조회</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * ============================================================================
+     * 1. 물리 상수 및 대한민국 시·군·구 대표 좌표 데이터베이스
+     * ============================================================================
+     */
+    const SPEED_OF_LIGHT = 299792458; // 빛의 속도 c (m/s)
+
+    // 개인정보 보호를 위해 상세 주소 대신 시·군·구 단위 대표 좌표만 사용
+    const KOREA_REGIONS = [
+      { name: "강원특별자치도 춘천시", lat: 37.8813, lon: 127.7298, demo: { temp: 12.4, windDir: 270, windSpd: 6.5, pty: "비", rn1: 4.5, pop: 70, reh: 82 } },
+      { name: "서울특별시 종로구", lat: 37.5730, lon: 126.9794, demo: { temp: 14.2, windDir: 250, windSpd: 5.2, pty: "비", rn1: 3.0, pop: 65, reh: 78 } },
+      { name: "서울특별시 강남구", lat: 37.5172, lon: 127.0473, demo: { temp: 14.6, windDir: 245, windSpd: 4.8, pty: "비", rn1: 2.5, pop: 60, reh: 76 } },
+      { name: "인천광역시 연수구", lat: 37.4102, lon: 126.6783, demo: { temp: 13.5, windDir: 290, windSpd: 8.4, pty: "비", rn1: 6.0, pop: 80, reh: 85 } },
+      { name: "경기도 수원시 팔달구", lat: 37.2821, lon: 127.0195, demo: { temp: 13.8, windDir: 260, windSpd: 5.8, pty: "비", rn1: 3.5, pop: 70, reh: 80 } },
+      { name: "경기도 성남시 분당구", lat: 37.3827, lon: 127.1189, demo: { temp: 13.6, windDir: 265, windSpd: 5.4, pty: "비", rn1: 3.2, pop: 68, reh: 79 } },
+      { name: "강원특별자치도 강릉시", lat: 37.7519, lon: 128.8761, demo: { temp: 11.8, windDir: 65, windSpd: 9.2, pty: "비", rn1: 11.5, pop: 90, reh: 91 } },
+      { name: "강원특별자치도 원주시", lat: 37.3422, lon: 127.9202, demo: { temp: 12.9, windDir: 265, windSpd: 5.6, pty: "비", rn1: 4.0, pop: 70, reh: 81 } },
+      { name: "대전광역시 유성구", lat: 36.3622, lon: 127.3565, demo: { temp: 15.1, windDir: 230, windSpd: 6.1, pty: "비", rn1: 5.0, pop: 75, reh: 83 } },
+      { name: "세종특별자치시", lat: 36.4800, lon: 127.2890, demo: { temp: 14.9, windDir: 235, windSpd: 5.9, pty: "비", rn1: 4.8, pop: 75, reh: 82 } },
+      { name: "충청북도 청주시 흥덕구", lat: 36.6358, lon: 127.4342, demo: { temp: 14.5, windDir: 240, windSpd: 5.7, pty: "비", rn1: 4.2, pop: 70, reh: 80 } },
+      { name: "충청남도 천안시 서북구", lat: 36.8151, lon: 127.1139, demo: { temp: 14.3, windDir: 255, windSpd: 6.3, pty: "비", rn1: 4.6, pop: 72, reh: 81 } },
+      { name: "광주광역시 북구", lat: 35.1742, lon: 126.9121, demo: { temp: 16.4, windDir: 210, windSpd: 7.4, pty: "비", rn1: 8.5, pop: 85, reh: 87 } },
+      { name: "전북특별자치도 전주시 덕진구", lat: 35.8468, lon: 127.1297, demo: { temp: 15.8, windDir: 220, windSpd: 6.8, pty: "비", rn1: 7.0, pop: 80, reh: 85 } },
+      { name: "전라남도 여수시", lat: 34.7604, lon: 127.6622, demo: { temp: 16.9, windDir: 195, windSpd: 10.5, pty: "비", rn1: 14.0, pop: 90, reh: 92 } },
+      { name: "대구광역시 수성구", lat: 35.8581, lon: 128.6306, demo: { temp: 16.2, windDir: 240, windSpd: 4.9, pty: "빗방울", rn1: 1.2, pop: 60, reh: 74 } },
+      { name: "경상북도 포항시 남구", lat: 36.0190, lon: 129.3435, demo: { temp: 15.6, windDir: 80, windSpd: 8.8, pty: "비", rn1: 9.0, pop: 85, reh: 88 } },
+      { name: "부산광역시 해운대구", lat: 35.1631, lon: 129.1636, demo: { temp: 17.5, windDir: 185, windSpd: 11.2, pty: "비", rn1: 12.5, pop: 90, reh: 89 } },
+      { name: "울산광역시 남구", lat: 35.5438, lon: 129.3301, demo: { temp: 17.0, windDir: 190, windSpd: 9.6, pty: "비", rn1: 10.0, pop: 85, reh: 87 } },
+      { name: "경상남도 창원시 성산구", lat: 35.2279, lon: 128.6818, demo: { temp: 16.8, windDir: 200, windSpd: 8.1, pty: "비", rn1: 8.8, pop: 80, reh: 86 } },
+      { name: "제주특별자치도 제주시", lat: 33.4996, lon: 126.5312, demo: { temp: 18.4, windDir: 175, windSpd: 13.5, pty: "비", rn1: 16.5, pop: 95, reh: 93 } }
+    ];
+
+    /**
+     * 기상청(KMA) 단기예보 공식 LCC DFS 격자 좌표 변환 함수
+     * (위도/경도 -> 기상청 동네예보 격자 NX, NY)
+     */
+    function dfsXyConv(lat, lon) {
+      const RE = 6371.00877; // 지구 반경(km)
+      const GRID = 5.0;      // 격자 간격(km)
+      const SLAT1 = 30.0;    // 투영 위도1(degree)
+      const SLAT2 = 60.0;    // 투영 위도2(degree)
+      const OLON = 126.0;    // 기준점 경도(degree)
+      const OLAT = 38.0;     // 기준점 위도(degree)
+      const XO = 43;         // 기준점 X좌표(GRID)
+      const YO = 136;        // 기준점 Y좌표(GRID)
+
+      const DEGRAD = Math.PI / 180.0;
+      const re = RE / GRID;
+      const slat1 = SLAT1 * DEGRAD;
+      const slat2 = SLAT2 * DEGRAD;
+      const olon = OLON * DEGRAD;
+      const olat = OLAT * DEGRAD;
+
+      let sn = Math.tan(Math.PI * 0.25 + slat2 * 0.5) / Math.tan(Math.PI * 0.25 + slat1 * 0.5);
+      sn = Math.log(Math.cos(slat1) / Math.cos(slat2)) / Math.log(sn);
+      let sf = Math.tan(Math.PI * 0.25 + slat1 * 0.5);
+      sf = (Math.pow(sf, sn) * Math.cos(slat1)) / sn;
+      let ro = Math.tan(Math.PI * 0.25 + olat * 0.5);
+      ro = (re * sf) / Math.pow(ro, sn);
+
+      let ra = Math.tan(Math.PI * 0.25 + lat * DEGRAD * 0.5);
+      ra = (re * sf) / Math.pow(ra, sn);
+      let theta = lon * DEGRAD - olon;
+      if (theta > Math.PI) theta -= 2.0 * Math.PI;
+      if (theta < -Math.PI) theta += 2.0 * Math.PI;
+      theta *= sn;
+
+      const nx = Math.floor(ra * Math.sin(theta) + XO + 0.5);
+      const ny = Math.floor(ro - ra * Math.cos(theta) + YO + 0.5);
+      return { nx, ny };
+    }
+
+    /**
+     * 위·경도로 가장 가까운 시·군·구 명칭 찾기 (상세 주소 비노출 원칙 준수)
+     */
+    function findNearestSiGunGu(lat, lon) {
+      let best = KOREA_REGIONS[0];
+      let minDist = Infinity;
+      for (const r of KOREA_REGIONS) {
+        const dLat = r.lat - lat;
+        const dLon = (r.lon - lon) * Math.cos((lat * Math.PI) / 180);
+        const dist = dLat * dLat + dLon * dLon;
+        if (dist < minDist) {
+          minDist = dist;
+          best = r;
+        }
+      }
+      // 대한민국 영역 외 좌표인 경우
+      if (minDist > 25) {
+        return {
+          name: `사용자 지정 좌표 (${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E)`,
+          lat,
+          lon,
+          demo: { temp: 14.0, windDir: 270, windSpd: 7.0, pty: "비", rn1: 5.0, pop: 75, reh: 80 }
+        };
+      }
+      return { ...best, lat, lon };
+    }
+
+    /**
+     * ============================================================================
+     * 2. 애플리케이션 전역 상태 (State)
+     * ============================================================================
+     */
+    const state = {
+      isPlaying: true,
+      simMode: "weather", // "weather" (기상 연동) | "experiment" (사용자 물리 실험)
+      radarDisplayMode: "hybrid", // "hybrid" | "velocity" | "reflectivity"
+      eduLevel: "hs", // "hs" | "univ"
+
+      // 위치 및 기상 데이터 상태
+      regionName: "강원특별자치도 춘천시",
+      lat: 37.8813,
+      lon: 127.7298,
+      nx: 73,
+      ny: 134,
+      kmaApiKey: localStorage.getItem("kma_doppler_api_key") || "",
+      isLiveWeather: false,
+      weatherStatusNote: "데모 모드 (예시 기상 데이터)",
+
+      weather: {
+        temp: 12.4,
+        windDir: 270,     // 기상학적 풍향 (불어오는 방향, deg)
+        windSpd: 6.5,     // 풍속 (m/s)
+        pty: "비",
+        rn1: 4.5,         // 1시간 강수량 (mm)
+        pop: 70,          // 강수확률 (%)
+        reh: 82,          // 습도 (%)
+        pressure: null,   // 기상청 초단기실황 미제공 항목 (임의 관측값 표기 금지)
+        hourly: []
+      },
+
+      // 물리 & 레이더 시뮬레이션 변수
+      physics: {
+        particleSpeed: 6.5,     // 강수 입자 전체 이동속도 |v| (m/s)
+        moveDir: 90,            // 강수 입자 이동 방향 (향방, deg: 0=N, 90=E, 180=S, 270=W)
+        freqGHz: 2.8,           // 레이더 송신 주파수 f0 (GHz)
+        maxRangeKm: 100,        // 레이더 관측 거리 (km)
+        cellRadiusKm: 26,       // 강수 영역 반경 (km)
+        cellDistKm: 48,         // 강수 영역 중심과 레이더 사이 거리 (km)
+        cellAzimuth: 270,       // 레이더에서 강수 영역 중심을 바라보는 방위각 (deg)
+        radarRpm: 4.0,          // 레이더 안테나 회전 속도 (RPM)
+        relBeamAngle: 180       // 강수 입자 이동 방향과 레이더 시선 벡터 사이의 각도 α (deg)
+      },
+
+      // 애니메이션 및 입자 상태
+      sweepAngle: 250,          // 현재 레이더 빔 방위각 (deg)
+      wavePhase: 0,
+      lastFrameTime: performance.now(),
+      elapsedSec: 0,
+      particles: [],
+      isDraggingCell: false,
+
+      // 실시간 그래프 히스토리
+      historyMaxLen: 140,
+      freqHistory: [],
+      totalVelHistory: [],
+      radialVelHistory: []
+    };
+
+    /**
+     * ============================================================================
+     * 3. 기상청(KMA) API 연동 및 데모 데이터 처리 로직
+     * ============================================================================
+     */
+    function degTo16Dir(deg) {
+      const dirs = ["북", "북북동", "북동", "동북동", "동", "동남동", "남동", "남남동", "남", "남남서", "남서", "서남서", "서", "서북서", "북서", "북북서"];
+      const idx = Math.round(((deg % 360) + 360) % 360 / 22.5) % 16;
+      return dirs[idx];
+    }
+
+    function parsePtyCode(code) {
+      const map = {
+        "0": "없음",
+        "1": "비",
+        "2": "비/눈",
+        "3": "눈",
+        "4": "소나기",
+        "5": "빗방울",
+        "6": "빗방울눈날림",
+        "7": "눈날림"
+      };
+      return map[String(code)] || "없음";
+    }
+
+    function generateDemoHourly(basePop, baseRn1, baseTemp) {
+      const now = new Date();
+      const list = [];
+      for (let i = 1; i <= 8; i++) {
+        const future = new Date(now.getTime() + i * 3600 * 1000);
+        const hh = String(future.getHours()).padStart(2, "0") + ":00";
+        const wave = Math.sin(i * 0.75);
+        const pop = Math.max(10, Math.min(95, Math.round(basePop + wave * 15)));
+        const pcp = pop >= 60 ? Math.max(0.5, +(baseRn1 * (0.7 + 0.4 * Math.cos(i * 0.6))).toFixed(1)) : 0;
+        const temp = +(baseTemp - i * 0.35).toFixed(1);
+        list.push({ time: hh, pop, pcp, temp, source: "데모" });
+      }
+      return list;
+    }
+
+    function getKmaUltraSrtBaseDateTime() {
+      // 초단기실황은 매시 정각 발표, 40분 이후 API 제공
+      const now = new Date();
+      if (now.getMinutes() < 42) {
+        now.setHours(now.getHours() - 1);
+      }
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const dd = String(now.getDate()).padStart(2, "0");
+      const hh = String(now.getHours()).padStart(2, "0");
+      return { baseDate: `${yyyy}${mm}${dd}`, baseTime: `${hh}00` };
+    }
+
+    function getKmaVilageFcstBaseDateTime() {
+      // 단기예보 발표시각: 02, 05, 08, 11, 14, 17, 20, 23시
+      const now = new Date();
+      const hours = now.getHours();
+      const mins = now.getMinutes();
+      const baseHours = [2, 5, 8, 11, 14, 17, 20, 23];
+      let selected = -1;
+      for (const bh of baseHours) {
+        if (hours > bh || (hours === bh && mins >= 15)) {
+          selected = bh;
+        }
+      }
+      if (selected === -1) {
+        now.setDate(now.getDate() - 1);
+        selected = 23;
+      }
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const dd = String(now.getDate()).padStart(2, "0");
+      const hh = String(selected).padStart(2, "0");
+      return { baseDate: `${yyyy}${mm}${dd}`, baseTime: `${hh}00` };
+    }
+
+    async function fetchWeatherForCurrentLocation() {
+      const grid = dfsXyConv(state.lat, state.lon);
+      state.nx = grid.nx;
+      state.ny = grid.ny;
+
+      const regionObj = findNearestSiGunGu(state.lat, state.lon);
+      const demo = regionObj.demo;
+
+      // 인증키가 없으면 즉시 데모 모드로 작동
+      if (!state.kmaApiKey || state.kmaApiKey.trim().length < 10) {
+        applyDemoWeather(demo, "데모 모드 (기상청 API 인증키 미설정)");
+        return;
+      }
+
+      try {
+        const keyParam = state.kmaApiKey.includes("%")
+          ? state.kmaApiKey.trim()
+          : encodeURIComponent(state.kmaApiKey.trim());
+
+        const ultra = getKmaUltraSrtBaseDateTime();
+        const ncstUrl = `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst?serviceKey=${keyParam}&pageNo=1&numOfRows=20&dataType=JSON&base_date=${ultra.baseDate}&base_time=${ultra.baseTime}&nx=${state.nx}&ny=${state.ny}`;
+
+        const fcst = getKmaVilageFcstBaseDateTime();
+        const fcstUrl = `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst?serviceKey=${keyParam}&pageNo=1&numOfRows=140&dataType=JSON&base_date=${fcst.baseDate}&base_time=${fcst.baseTime}&nx=${state.nx}&ny=${state.ny}`;
+
+        const [ncstRes, fcstRes] = await Promise.all([fetch(ncstUrl), fetch(fcstUrl)]);
+        if (!ncstRes.ok) throw new Error(`HTTP ${ncstRes.status}`);
+
+        const ncstJson = await ncstRes.json();
+        const items = ncstJson?.response?.body?.items?.item;
+        if (!items || !Array.isArray(items)) {
+          const errMsg = ncstJson?.response?.header?.resultMsg || "응답 데이터 형식 오류";
+          throw new Error(errMsg);
+        }
+
+        const obsMap = {};
+        for (const it of items) {
+          obsMap[it.category] = it.obsrValue;
+        }
+
+        // 단기예보에서 강수확률(POP) 및 시간대별 강수 예보 추출
+        let hourlyList = [];
+        let nearestPop = null;
+        if (fcstRes.ok) {
+          const fcstJson = await fcstRes.json();
+          const fItems = fcstJson?.response?.body?.items?.item || [];
+          const byTime = {};
+          for (const fi of fItems) {
+            const key = `${fi.fcstDate}_${fi.fcstTime}`;
+            if (!byTime[key]) byTime[key] = { date: fi.fcstDate, time: fi.fcstTime };
+            byTime[key][fi.category] = fi.fcstValue;
+          }
+          const sortedKeys = Object.keys(byTime).sort();
+          for (const k of sortedKeys.slice(0, 8)) {
+            const row = byTime[k];
+            if (nearestPop === null && row.POP !== undefined) {
+              nearestPop = Number(row.POP);
+            }
+            hourlyList.push({
+              time: `${row.time.slice(0, 2)}:00`,
+              pop: row.POP !== undefined ? Number(row.POP) : null,
+              pcp: row.PCP && row.PCP !== "강수없음" ? row.PCP : "0mm",
+              temp: row.TMP !== undefined ? Number(row.TMP) : null,
+              source: "기상청 예보"
+            });
+          }
+        }
+
+        state.isLiveWeather = true;
+        state.weatherStatusNote = "기상청(KMA) 공식 API 실황·예보 연동 중";
+        state.weather = {
+          temp: obsMap.T1H !== undefined ? Number(obsMap.T1H) : null,
+          windDir: obsMap.VEC !== undefined ? Number(obsMap.VEC) : null,
+          windSpd: obsMap.WSD !== undefined ? Number(obsMap.WSD) : null,
+          pty: obsMap.PTY !== undefined ? parsePtyCode(obsMap.PTY) : "미제공",
+          rn1: obsMap.RN1 !== undefined ? Number(obsMap.RN1) : null,
+          pop: nearestPop, // 초단기실황 미제공 시 단기예보 POP 또는 null(미제공)
+          reh: obsMap.REH !== undefined ? Number(obsMap.REH) : null,
+          pressure: null,  // 기상청 초단기실황 API는 기압을 제공하지 않으므로 null 유지
+          hourly: hourlyList
+        };
+
+        updateWeatherUI();
+        if (state.simMode === "weather") {
+          syncWeatherToSimulation();
+        }
+      } catch (err) {
+        console.warn("기상청 API 호출 실패, 데모 모드로 전환:", err);
+        applyDemoWeather(
+          demo,
+          `데모 모드 전환 (API 연결 실패 또는 CORS 제한: ${err.message})`
+        );
+      }
+    }
+
+    function applyDemoWeather(demo, note) {
+      state.isLiveWeather = false;
+      state.weatherStatusNote = note;
+      state.weather = {
+        temp: demo.temp,
+        windDir: demo.windDir,
+        windSpd: demo.windSpd,
+        pty: demo.pty,
+        rn1: demo.rn1,
+        pop: demo.pop,
+        reh: demo.reh,
+        pressure: null,
+        hourly: generateDemoHourly(demo.pop, demo.rn1, demo.temp)
+      };
+      updateWeatherUI();
+      if (state.simMode === "weather") {
+        syncWeatherToSimulation();
+      }
+    }
+
+    function updateWeatherUI() {
+      const badge = document.getElementById("weatherSourceBadge");
+      const badgeText = document.getElementById("weatherSourceText");
+      if (state.isLiveWeather) {
+        badge.className = "badge badge-live";
+        badgeText.textContent = "기상청(KMA) API 실황·예보 연동";
+      } else {
+        badge.className = "badge badge-demo";
+        badgeText.textContent = state.weatherStatusNote;
+      }
+
+      document.getElementById("displayRegionName").textContent = `📍 ${state.regionName}`;
+      document.getElementById("displayGridInfo").textContent =
+        `위·경도: ${state.lat.toFixed(2)}°N, ${state.lon.toFixed(2)}°E | KMA 격자: NX ${state.nx}, NY ${state.ny}`;
+
+      const nowStr = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      document.getElementById("lastUpdateText").textContent = `갱신 시각: ${nowStr}`;
+
+      const srcLabel = state.isLiveWeather ? "KMA 실황" : "데모";
+      const fcstLabel = state.isLiveWeather ? "KMA 예보" : "데모";
+
+      const w = state.weather;
+      document.getElementById("tagTemp").textContent = srcLabel;
+      document.getElementById("valTemp").textContent = w.temp !== null ? `${w.temp.toFixed(1)} °C` : "관측값 미제공";
+
+      document.getElementById("tagWindDir").textContent = srcLabel;
+      document.getElementById("valWindDir").textContent =
+        w.windDir !== null ? `${Math.round(w.windDir)}° (${degTo16Dir(w.windDir)}풍)` : "관측값 미제공";
+
+      document.getElementById("tagWindSpd").textContent = srcLabel;
+      document.getElementById("valWindSpd").textContent = w.windSpd !== null ? `${w.windSpd.toFixed(1)} m/s` : "관측값 미제공";
+
+      document.getElementById("tagPty").textContent = srcLabel;
+      document.getElementById("valPty").textContent = w.pty || "관측값 미제공";
+
+      document.getElementById("tagRn1").textContent = srcLabel;
+      document.getElementById("valRn1").textContent = w.rn1 !== null ? `${w.rn1.toFixed(1)} mm` : "관측값 미제공";
+
+      document.getElementById("tagPop").textContent = w.pop !== null ? fcstLabel : "미제공";
+      document.getElementById("valPop").textContent = w.pop !== null ? `${w.pop} %` : "관측값 미제공";
+
+      document.getElementById("tagReh").textContent = srcLabel;
+      document.getElementById("valReh").textContent = w.reh !== null ? `${w.reh} %` : "관측값 미제공";
+
+      // 기압은 기상청 초단기실황 API에서 제공하지 않으므로 임의로 관측값처럼 표시하지 않음
+      document.getElementById("tagPres").textContent = "API 미제공";
+      document.getElementById("valPres").textContent = "관측값 미제공";
+      document.getElementById("subPres").textContent = "KMA 단기예보/실황 미포함 항목";
+
+      // 시간대별 강수 예보 렌더링
+      const hourlyContainer = document.getElementById("hourlyForecastList");
+      hourlyContainer.innerHTML = "";
+      document.getElementById("forecastSourceNote").textContent =
+        state.isLiveWeather ? "출처: 기상청 단기예보 API (POP/PCP)" : "출처: 데모 예보 시퀀스 (모의 데이터)";
+
+      if (w.hourly && w.hourly.length > 0) {
+        for (const h of w.hourly) {
+          const card = document.createElement("div");
+          card.className = "hour-card";
+          const popStr = h.pop !== null ? `${h.pop}%` : "미제공";
+          const pcpStr = typeof h.pcp === "number" ? (h.pcp > 0 ? `${h.pcp}mm` : "강수없음") : h.pcp;
+          const tmpStr = h.temp !== null ? `${h.temp}°` : "";
+          card.innerHTML = `
+            <div class="h-time">${h.time}</div>
+            <div class="h-pop">확률 ${popStr}</div>
+            <div class="h-pcp">${pcpStr} ${tmpStr}</div>
+          `;
+          hourlyContainer.appendChild(card);
+        }
+      } else {
+        hourlyContainer.innerHTML = `<div style="font-size:0.78rem; color:var(--text-muted);">시간대별 예보 데이터가 제공되지 않았습니다.</div>`;
+      }
+    }
+
+    /**
+     * 기상정보를 시뮬레이션 초기 물리 조건으로 반영
+     */
+    function syncWeatherToSimulation() {
+      const w = state.weather;
+      const spd = w.windSpd !== null && w.windSpd > 0 ? w.windSpd : 5.0;
+      const windFrom = w.windDir !== null ? w.windDir : 270;
+      // 기상학적 풍향은 '불어오는 방향'이므로, 입자 이동 방향(향방)은 +180도
+      const moveToward = (windFrom + 180) % 360;
+
+      // 강수량 및 강수확률 기반 모의 강수 영역 크기 산정 (강수확률과 물리적 반사도는 구분)
+      const rn = w.rn1 !== null ? w.rn1 : 2.0;
+      const pop = w.pop !== null ? w.pop : 50;
+      const radiusKm = Math.round(Math.max(14, Math.min(48, 15 + pop * 0.22 + rn * 1.1)));
+
+      // 바람이 불어오는 상류 쪽에 강수셀 배치하여 레이더로 접근하는 장면을 기본 구성
+      state.physics.particleSpeed = Math.min(50, Math.max(0.5, spd));
+      state.physics.moveDir = Math.round(moveToward);
+      state.physics.cellAzimuth = Math.round(windFrom);
+      state.physics.cellDistKm = Math.min(Math.round(state.physics.maxRangeKm * 0.5), 48);
+      state.physics.cellRadiusKm = radiusKm;
+      state.physics.relBeamAngle = computeBeamAngle(state.physics.moveDir, state.physics.cellAzimuth);
+
+      syncControlsFromState();
+      rebuildParticles();
+      updatePhysicsDashboard();
+    }
+
+    /**
+     * ============================================================================
+     * 4. 도플러 기상 레이더 핵심 물리 계산 엔진
+     * ============================================================================
+     */
+    function normalizeAngle(deg) {
+      return ((deg % 360) + 360) % 360;
+    }
+
+    /**
+     * 강수 입자 이동 방향(moveDir)과 레이더 시선 방향(cellAzimuth) 사이의 각도 α (0° ~ 180°)
+     * - 레이더에서 강수셀을 향하는 단위벡터 r_hat = (sin(az), cos(az))
+     * - 입자 이동 단위벡터 v_hat = (sin(moveDir), cos(moveDir))
+     * - cos(α) = r_hat · v_hat = cos(moveDir - az)
+     * - α = 180°: 레이더 정면 접근 (v_r = -|v|, 접근속도 +|v|)
+     * - α = 0°:   레이더 정면 후퇴 (v_r = +|v|, 접근속도 -|v|)
+     * - α = 90°:  레이더 시선과 직각 이동 (v_r = 0, Δf = 0)
+     */
+    function computeBeamAngle(moveDirDeg, cellAzimuthDeg) {
+      const diffRad = ((moveDirDeg - cellAzimuthDeg) * Math.PI) / 180;
+      const cosAlpha = Math.max(-1, Math.min(1, Math.cos(diffRad)));
+      return Math.round((Math.acos(cosAlpha) * 180) / Math.PI);
+    }
+
+    function calculateDopplerPhysics() {
+      const p = state.physics;
+      const f0Hz = p.freqGHz * 1e9;                    // 송신 주파수 (Hz)
+      const lambdaM = SPEED_OF_LIGHT / f0Hz;           // 파장 λ = c / f0 (m)
+      const lambdaCm = lambdaM * 100;                  // 파장 (cm)
+
+      // 레이더 시선 방향 벡터와 입자 속도 벡터의 내적
+      const azRad = (p.cellAzimuth * Math.PI) / 180;
+      const moveRad = (p.moveDir * Math.PI) / 180;
+      const rHat = { x: Math.sin(azRad), y: Math.cos(azRad) };
+      const vVec = {
+        x: p.particleSpeed * Math.sin(moveRad),
+        y: p.particleSpeed * Math.cos(moveRad)
+      };
+
+      // 기상 레이더 표준 시선속도 vr: 멀어지면 (+), 접근하면 (-)
+      const radialVelSigned = vVec.x * rHat.x + vVec.y * rHat.y;
+      // 레이더 기준 접근 상대속도 v_rel = -vr (접근 시 +, 후퇴 시 -)
+      const closingSpeed = -radialVelSigned;
+
+      // 도플러 주파수 변화 공식: Δf = 2 * vr / λ (접근 시 주파수 증가 +, 후퇴 시 주파수 감소 -)
+      const deltaFHz = (2 * closingSpeed) / lambdaM;
+      const rxFreqHz = f0Hz + deltaFHz;
+
+      // 시선각 α 계산
+      const cosAlpha = p.particleSpeed > 1e-6
+        ? Math.max(-1, Math.min(1, radialVelSigned / p.particleSpeed))
+        : Math.cos((p.relBeamAngle * Math.PI) / 180);
+      const alphaDeg = (Math.acos(cosAlpha) * 180) / Math.PI;
+
+      // 기상학적 풍향 (입자가 이동하는 방향의 정반대)
+      const windFromDeg = normalizeAngle(p.moveDir + 180);
+
+      return {
+        f0Hz,
+        f0GHz: p.freqGHz,
+        rxFreqHz,
+        rxFreqGHz: rxFreqHz / 1e9,
+        lambdaM,
+        lambdaCm,
+        totalSpeed: p.particleSpeed,
+        radialVelSigned,  // 기상학 표기: (-) 접근[초록], (+) 후퇴[빨강]
+        closingSpeed,     // 물리학 접근 상대속도: (+) 접근, (-) 후퇴
+        deltaFHz,         // (+) 주파수 증가[접근], (-) 주파수 감소[후퇴]
+        alphaDeg,
+        moveDir: p.moveDir,
+        windFromDeg
+      };
+    }
+
+    function getBandLabel(freqGHz) {
+      if (freqGHz < 4.0) return "S-밴드 (장거리 기상관측)";
+      if (freqGHz < 8.0) return "C-밴드 (중거리 기상관측)";
+      return "X-밴드 (고해상도 국지관측)";
+    }
+
+    function updatePhysicsDashboard() {
+      const phys = calculateDopplerPhysics();
+
+      document.getElementById("outF0").textContent = `${phys.f0GHz.toFixed(6)} GHz`;
+      document.getElementById("outF0Hz").textContent = `${Math.round(phys.f0Hz).toLocaleString()} Hz`;
+
+      document.getElementById("outFrx").textContent = `${phys.rxFreqGHz.toFixed(6)} GHz`;
+      const signDf = phys.deltaFHz >= 0 ? "+" : "";
+      document.getElementById("outFrxOffset").textContent = `f₀ ${signDf}${phys.deltaFHz.toFixed(1)} Hz`;
+
+      document.getElementById("outLambda").textContent = `${phys.lambdaCm.toFixed(2)} cm`;
+      document.getElementById("outLambdaM").textContent = `${phys.lambdaM.toFixed(6)} m (${getBandLabel(phys.f0GHz).split(" ")[0]})`;
+
+      const dfCard = document.getElementById("cardDeltaF");
+      const vrCard = document.getElementById("cardRadialVel");
+      const dopplerBadge = document.getElementById("dopplerStateBadge");
+
+      document.getElementById("outDeltaF").textContent = `${signDf}${phys.deltaFHz.toFixed(1)} Hz`;
+
+      const signVr = phys.radialVelSigned > 0 ? "+" : "";
+      document.getElementById("outRadialVel").textContent = `${signVr}${phys.radialVelSigned.toFixed(2)} m/s`;
+
+      if (phys.closingSpeed > 0.15) {
+        dfCard.className = "metric-card highlight-approach";
+        vrCard.className = "metric-card highlight-approach";
+        dopplerBadge.className = "badge badge-live";
+        dopplerBadge.textContent = "레이더 접근 중 · 파장 압축 · 주파수 증가 (+Δf)";
+        document.getElementById("outDeltaFDesc").textContent = "접근: 수신 주파수 상승 (청색편이)";
+        document.getElementById("outRadialVelDesc").textContent = `접근 성분 ${phys.closingSpeed.toFixed(2)} m/s (초록 계열)`;
+      } else if (phys.closingSpeed < -0.15) {
+        dfCard.className = "metric-card highlight-recede";
+        vrCard.className = "metric-card highlight-recede";
+        dopplerBadge.className = "badge";
+        dopplerBadge.style.background = "rgba(239, 68, 68, 0.16)";
+        dopplerBadge.style.color = "#fca5a5";
+        dopplerBadge.style.borderColor = "rgba(239, 68, 68, 0.45)";
+        dopplerBadge.textContent = "레이더 후퇴 중 · 파장 신장 · 주파수 감소 (-Δf)";
+        document.getElementById("outDeltaFDesc").textContent = "후퇴: 수신 주파수 하강 (적색편이)";
+        document.getElementById("outRadialVelDesc").textContent = `후퇴 성분 ${Math.abs(phys.closingSpeed).toFixed(2)} m/s (빨강 계열)`;
+      } else {
+        dfCard.className = "metric-card";
+        vrCard.className = "metric-card";
+        dopplerBadge.className = "badge badge-sim";
+        dopplerBadge.style.background = "";
+        dopplerBadge.style.color = "";
+        dopplerBadge.style.borderColor = "";
+        dopplerBadge.textContent = "시선 직각/정지 · 도플러 편이 ≈ 0 Hz";
+        document.getElementById("outDeltaFDesc").textContent = "시선 속도 성분 ≈ 0 (0 등속선)";
+        document.getElementById("outRadialVelDesc").textContent = "시선 방향 성분 없음 (중립색)";
+      }
+
+      document.getElementById("outTotalSpeed").textContent = `${phys.totalSpeed.toFixed(2)} m/s`;
+      document.getElementById("outTotalSpeedKmh").textContent = `${(phys.totalSpeed * 3.6).toFixed(1)} km/h`;
+
+      document.getElementById("outMoveDir").textContent = `${Math.round(phys.moveDir)}° (${degTo16Dir(phys.moveDir)}진)`;
+      document.getElementById("outBeamAngle").textContent = `레이더 시선각 α: ${phys.alphaDeg.toFixed(1)}°`;
+
+      document.getElementById("outWindSummary").textContent = `${Math.round(phys.windFromDeg)}° · ${phys.totalSpeed.toFixed(1)} m/s`;
+      document.getElementById("outWindText").textContent = `${degTo16Dir(phys.windFromDeg)}풍 (${degTo16Dir(phys.windFromDeg)}→${degTo16Dir(phys.moveDir)})`;
+
+      document.getElementById("labelWindEquivalent").textContent = `풍향 ${Math.round(phys.windFromDeg)}°(${degTo16Dir(phys.windFromDeg)}풍)`;
+      document.getElementById("labelBandName").textContent = getBandLabel(phys.f0GHz);
+      document.getElementById("radarTopTag").textContent =
+        `관측반경: ${state.physics.maxRangeKm} km | 회전: ${state.physics.radarRpm.toFixed(1)} RPM | 🖱 강수셀 드래그 이동 가능`;
+    }
+
+    /**
+     * ============================================================================
+     * 5. 강수 입자 시스템 (Hydrometeor Particles)
+     * ============================================================================
+     */
+    function rebuildParticles() {
+      const count = 240;
+      const list = [];
+      for (let i = 0; i < count; i++) {
+        // 원형 강수셀 내부 균일 분포를 위한 제곱근 반경 샘플링
+        const rNorm = Math.sqrt(Math.random());
+        const theta = Math.random() * Math.PI * 2;
+        list.push({
+          localX: rNorm * Math.cos(theta),
+          localY: rNorm * Math.sin(theta),
+          size: 1.5 + Math.random() * 2.2,
+          turbVx: (Math.random() - 0.5) * 0.4,
+          turbVy: (Math.random() - 0.5) * 0.4,
+          intensity: 1 - rNorm * 0.65 + (Math.random() - 0.5) * 0.15
+        });
+      }
+      state.particles = list;
+    }
+
+    function stepSimulation(dt) {
+      const p = state.physics;
+      // 안테나 회전 각속도 (RPM -> deg/sec)
+      const degPerSec = (p.radarRpm * 360) / 60;
+      state.sweepAngle = normalizeAngle(state.sweepAngle + degPerSec * dt);
+
+      // 전자기파 위상 애니메이션
+      state.wavePhase += dt * 4.5;
+
+      // 입자 이동 애니메이션 (강수셀 내부에서 바람 방향으로 흐르며 순환)
+      const moveRad = (p.moveDir * Math.PI) / 180;
+      const vxKmPerSec = (p.particleSpeed * Math.sin(moveRad)) / 1000;
+      const vyKmPerSec = (p.particleSpeed * Math.cos(moveRad)) / 1000;
+      // 교육적 시각화를 위한 시간 배속 (실제 바람 이동이 눈에 보이도록 120x 배속)
+      const visualTimeScale = 120;
+
+      for (const pt of state.particles) {
+        pt.localX += ((vxKmPerSec * visualTimeScale) / Math.max(8, p.cellRadiusKm)) * dt + pt.turbVx * 0.03 * dt;
+        pt.localY += ((vyKmPerSec * visualTimeScale) / Math.max(8, p.cellRadiusKm)) * dt + pt.turbVy * 0.03 * dt;
+
+        const distSq = pt.localX * pt.localX + pt.localY * pt.localY;
+        if (distSq > 1.0) {
+          // 반대편 바람 상류 경계로 재진입
+          const angle = Math.atan2(pt.localY, pt.localX) + Math.PI + (Math.random() - 0.5) * 0.6;
+          pt.localX = 0.94 * Math.cos(angle);
+          pt.localY = 0.94 * Math.sin(angle);
+        }
+      }
+
+      // 그래프 히스토리 기록 (약 0.15초 간격)
+      state.elapsedSec += dt;
+      if (state.freqHistory.length === 0 || state.elapsedSec >= 0.15) {
+        state.elapsedSec = 0;
+        const phys = calculateDopplerPhysics();
+        state.freqHistory.push(phys.deltaFHz);
+        state.totalVelHistory.push(phys.totalSpeed);
+        state.radialVelHistory.push(phys.radialVelSigned);
+
+        if (state.freqHistory.length > state.historyMaxLen) {
+          state.freqHistory.shift();
+          state.totalVelHistory.shift();
+          state.radialVelHistory.shift();
+        }
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 6. 캔버스 렌더링: (1) PPI 도플러 기상 레이더
+     * ============================================================================
+     */
+    const radarCanvas = document.getElementById("radarCanvas");
+    const radarCtx = radarCanvas.getContext("2d");
+
+    function velocityToColor(vr, alpha = 0.85) {
+      // 기상 레이더 시선속도 색상표: 접근(-, 초록) / 0(중립 회색) / 후퇴(+, 빨강)
+      const maxV = 30;
+      const clamped = Math.max(-maxV, Math.min(maxV, vr));
+      const norm = clamped / maxV; // -1 ~ +1
+
+      if (Math.abs(norm) < 0.04) {
+        return `rgba(160, 174, 192, ${alpha})`; // 중립색 (0 등속선)
+      }
+      if (norm < 0) {
+        // 접근 (-): 청록 -> 밝은 초록
+        const t = Math.min(1, Math.abs(norm));
+        const r = Math.round(45 * (1 - t));
+        const g = Math.round(185 + 70 * t);
+        const b = Math.round(165 * (1 - t * 0.65));
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      } else {
+        // 후퇴 (+): 주황 -> 선명한 빨강
+        const t = Math.min(1, norm);
+        const r = Math.round(220 + 35 * t);
+        const g = Math.round(150 * (1 - t * 0.82));
+        const b = Math.round(60 * (1 - t * 0.85));
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+    }
+
+    function reflectivityToColor(intensity, alpha = 0.8) {
+      // 모의 강수 강도 (dBZ) 색상
+      if (intensity < 0.25) return `rgba(56, 189, 248, ${alpha * 0.7})`;
+      if (intensity < 0.48) return `rgba(34, 197, 94, ${alpha * 0.82})`;
+      if (intensity < 0.70) return `rgba(234, 179, 8, ${alpha * 0.88})`;
+      if (intensity < 0.88) return `rgba(249, 115, 22, ${alpha * 0.92})`;
+      return `rgba(239, 68, 68, ${alpha * 0.95})`;
+    }
+
+    function drawArrow(ctx, x1, y1, x2, y2, color, lineWidth = 2, headLen = 8) {
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function renderRadarCanvas() {
+      const W = radarCanvas.width;
+      const H = radarCanvas.height;
+      const cx = W / 2;
+      const cy = H / 2;
+      const R = Math.min(W, H) * 0.43;
+      const p = state.physics;
+      const kmToPx = R / p.maxRangeKm;
+
+      radarCtx.clearRect(0, 0, W, H);
+
+      // 1. 배경 방사형 그라데이션
+      const bgGrad = radarCtx.createRadialGradient(cx, cy, 8, cx, cy, R * 1.12);
+      bgGrad.addColorStop(0, "#08182e");
+      bgGrad.addColorStop(0.7, "#040c1a");
+      bgGrad.addColorStop(1, "#02060e");
+      radarCtx.fillStyle = bgGrad;
+      radarCtx.fillRect(0, 0, W, H);
+
+      // 레이더 원형 클리핑 영역
+      radarCtx.save();
+      radarCtx.beginPath();
+      radarCtx.arc(cx, cy, R, 0, Math.PI * 2);
+      radarCtx.clip();
+
+      // 2. 강수 영역(구름) 및 도플러 시선속도장 렌더링
+      const cellAzRad = (p.cellAzimuth * Math.PI) / 180;
+      const cellCenterX = cx + p.cellDistKm * kmToPx * Math.sin(cellAzRad);
+      const cellCenterY = cy - p.cellDistKm * kmToPx * Math.cos(cellAzRad);
+      const cellRadiusPx = p.cellRadiusKm * kmToPx;
+
+      const moveRad = (p.moveDir * Math.PI) / 180;
+      const vx = p.particleSpeed * Math.sin(moveRad);
+      const vy = p.particleSpeed * Math.cos(moveRad);
+
+      // 강수 영역 내부를 격자 셀로 나누어 각 위치의 실제 시선속도 v_r(x,y) = v · r_hat(x,y) 계산 후 색상 표시
+      const gridStep = Math.max(6, Math.round(cellRadiusPx / 15));
+      const rainFactor = Math.min(1.2, 0.45 + (state.weather.rn1 || 4) * 0.05 + (state.weather.pop || 60) * 0.004);
+
+      for (let gx = -cellRadiusPx; gx <= cellRadiusPx; gx += gridStep) {
+        for (let gy = -cellRadiusPx; gy <= cellRadiusPx; gy += gridStep) {
+          const distFromCell = Math.hypot(gx, gy);
+          if (distFromCell > cellRadiusPx) continue;
+
+          const px = cellCenterX + gx;
+          const py = cellCenterY + gy;
+          const rx = px - cx;
+          const ry = cy - py; // 북쪽이 +y
+          const rDist = Math.hypot(rx, ry);
+          if (rDist < 2) continue;
+
+          // 해당 격자점에서의 단위 시선 벡터와 속도 벡터의 내적 = 위치별 시선속도 vr
+          const localVr = (vx * rx + vy * ry) / rDist;
+          const edgeFade = Math.max(0.15, 1 - Math.pow(distFromCell / cellRadiusPx, 1.8));
+
+          if (state.radarDisplayMode === "reflectivity") {
+            const dbzNorm = Math.min(1, edgeFade * rainFactor);
+            radarCtx.fillStyle = reflectivityToColor(dbzNorm, 0.72 * edgeFade);
+          } else {
+            radarCtx.fillStyle = velocityToColor(localVr, 0.62 * edgeFade);
+          }
+
+          radarCtx.beginPath();
+          radarCtx.arc(px, py, gridStep * 0.72, 0, Math.PI * 2);
+          radarCtx.fill();
+        }
+      }
+
+      // 3. 개별 강수 입자(Hydrometeor) 점 렌더링
+      for (const pt of state.particles) {
+        const px = cellCenterX + pt.localX * cellRadiusPx;
+        const py = cellCenterY + pt.localY * cellRadiusPx;
+        const rx = px - cx;
+        const ry = cy - py;
+        const rDist = Math.hypot(rx, ry) || 1;
+        const ptVr = (vx * rx + vy * ry) / rDist;
+
+        radarCtx.fillStyle =
+          state.radarDisplayMode === "reflectivity"
+            ? reflectivityToColor(pt.intensity * rainFactor, 0.95)
+            : velocityToColor(ptVr, 0.95);
+
+        radarCtx.beginPath();
+        radarCtx.arc(px, py, pt.size, 0, Math.PI * 2);
+        radarCtx.fill();
+      }
+
+      // 4. Zero Isodop (시선속도 0 등속선) 점선 표시 (속도장 / 복합 모드)
+      if (state.radarDisplayMode !== "reflectivity" && p.particleSpeed > 0.2) {
+        const perpRad = moveRad + Math.PI / 2;
+        radarCtx.save();
+        radarCtx.strokeStyle = "rgba(226, 232, 240, 0.35)";
+        radarCtx.setLineDash([5, 5]);
+        radarCtx.lineWidth = 1.2;
+        radarCtx.beginPath();
+        radarCtx.moveTo(cx - R * Math.sin(perpRad), cy + R * Math.cos(perpRad));
+        radarCtx.lineTo(cx + R * Math.sin(perpRad), cy - R * Math.cos(perpRad));
+        radarCtx.stroke();
+        radarCtx.restore();
+      }
+
+      // 5. 레이더 전파 펄스 방사형 파동 애니메이션 (복합 모드)
+      if (state.radarDisplayMode === "hybrid") {
+        const pulseCount = 4;
+        for (let i = 0; i < pulseCount; i++) {
+          const progress = ((state.wavePhase * 0.25 + i / pulseCount) % 1);
+          const pulseR = progress * R;
+          radarCtx.strokeStyle = `rgba(45, 212, 191, ${(1 - progress) * 0.26})`;
+          radarCtx.lineWidth = 1.4;
+          radarCtx.beginPath();
+          radarCtx.arc(cx, cy, pulseR, 0, Math.PI * 2);
+          radarCtx.stroke();
+        }
+      }
+
+      // 6. 회전하는 레이더 스윕 빔 및 잔광(Afterglow)
+      const sweepRad = ((state.sweepAngle - 90) * Math.PI) / 180;
+      const trailSpan = (38 * Math.PI) / 180;
+      const steps = 24;
+      for (let i = 0; i < steps; i++) {
+        const a1 = sweepRad - (trailSpan * i) / steps;
+        const a2 = sweepRad - (trailSpan * (i + 1)) / steps;
+        const opacity = (1 - i / steps) * 0.28;
+        radarCtx.fillStyle = `rgba(45, 212, 191, ${opacity})`;
+        radarCtx.beginPath();
+        radarCtx.moveTo(cx, cy);
+        radarCtx.arc(cx, cy, R, a2, a1);
+        radarCtx.closePath();
+        radarCtx.fill();
+      }
+
+      // 빔 중심선
+      radarCtx.strokeStyle = "rgba(94, 234, 212, 0.92)";
+      radarCtx.lineWidth = 2;
+      radarCtx.beginPath();
+      radarCtx.moveTo(cx, cy);
+      radarCtx.lineTo(cx + R * Math.cos(sweepRad), cy + R * Math.sin(sweepRad));
+      radarCtx.stroke();
+
+      // 7. 동심원 거리 링 및 방위각 눈금
+      const ringCount = 4;
+      radarCtx.strokeStyle = "rgba(56, 189, 248, 0.24)";
+      radarCtx.lineWidth = 1;
+      radarCtx.font = "11px monospace";
+      radarCtx.fillStyle = "rgba(148, 163, 184, 0.85)";
+
+      for (let i = 1; i <= ringCount; i++) {
+        const rr = (R * i) / ringCount;
+        const distLabel = Math.round((p.maxRangeKm * i) / ringCount);
+        radarCtx.beginPath();
+        radarCtx.arc(cx, cy, rr, 0, Math.PI * 2);
+        radarCtx.stroke();
+        radarCtx.fillText(`${distLabel}km`, cx + 4, cy - rr + 13);
+      }
+
+      // 방위선 (30도 간격)
+      for (let deg = 0; deg < 360; deg += 30) {
+        const rad = ((deg - 90) * Math.PI) / 180;
+        radarCtx.strokeStyle = deg % 90 === 0 ? "rgba(56, 189, 248, 0.32)" : "rgba(56, 189, 248, 0.12)";
+        radarCtx.beginPath();
+        radarCtx.moveTo(cx, cy);
+        radarCtx.lineTo(cx + R * Math.cos(rad), cy + R * Math.sin(rad));
+        radarCtx.stroke();
+      }
+
+      // 8. 강수셀 경계, 시선 벡터 및 속도 성분 분해 화살표
+      radarCtx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+      radarCtx.setLineDash([4, 4]);
+      radarCtx.lineWidth = 1.3;
+      radarCtx.beginPath();
+      radarCtx.arc(cellCenterX, cellCenterY, cellRadiusPx, 0, Math.PI * 2);
+      radarCtx.stroke();
+      radarCtx.setLineDash([]);
+
+      // 레이더 -> 강수셀 중심 시선 점선
+      radarCtx.strokeStyle = "rgba(56, 189, 248, 0.65)";
+      radarCtx.setLineDash([3, 3]);
+      radarCtx.beginPath();
+      radarCtx.moveTo(cx, cy);
+      radarCtx.lineTo(cellCenterX, cellCenterY);
+      radarCtx.stroke();
+      radarCtx.setLineDash([]);
+
+      // 속도 벡터 분해 표시 (전체 이동속도 v vs 레이더 시선속도 vr)
+      if (p.particleSpeed > 0.2) {
+        const vecScale = Math.min(75, Math.max(24, p.particleSpeed * 2.2));
+        const endVx = cellCenterX + vecScale * Math.sin(moveRad);
+        const endVy = cellCenterY - vecScale * Math.cos(moveRad);
+
+        // 전체 이동속도 벡터 v (노란색)
+        drawArrow(radarCtx, cellCenterX, cellCenterY, endVx, endVy, "#facc15", 2.5, 9);
+        radarCtx.fillStyle = "#fef08a";
+        radarCtx.font = "bold 11px sans-serif";
+        radarCtx.fillText(`v (${p.particleSpeed.toFixed(1)}m/s)`, endVx + 6, endVy - 4);
+
+        // 시선속도 벡터 vr (초록/빨강)
+        const phys = calculateDopplerPhysics();
+        const vrScale = (phys.radialVelSigned / Math.max(0.1, p.particleSpeed)) * vecScale;
+        const endVrx = cellCenterX + vrScale * Math.sin(cellAzRad);
+        const endVry = cellCenterY - vrScale * Math.cos(cellAzRad);
+        if (Math.abs(vrScale) > 4) {
+          const vrColor = phys.radialVelSigned < 0 ? "#4ade80" : "#f87171";
+          drawArrow(radarCtx, cellCenterX, cellCenterY, endVrx, endVry, vrColor, 2.5, 8);
+          radarCtx.fillStyle = vrColor;
+          radarCtx.fillText(`vr (${phys.radialVelSigned.toFixed(1)}m/s)`, endVrx + 6, endVry + 12);
+        }
+      }
+
+      // 중앙 레이더 관측소 마커
+      radarCtx.fillStyle = "#38bdf8";
+      radarCtx.beginPath();
+      radarCtx.arc(cx, cy, 6, 0, Math.PI * 2);
+      radarCtx.fill();
+      radarCtx.strokeStyle = "#ffffff";
+      radarCtx.lineWidth = 1.5;
+      radarCtx.stroke();
+
+      radarCtx.restore(); // 원형 클리핑 해제
+
+      // 외곽 테두리 및 동서남북 방위 표기
+      radarCtx.strokeStyle = "rgba(56, 189, 248, 0.55)";
+      radarCtx.lineWidth = 2;
+      radarCtx.beginPath();
+      radarCtx.arc(cx, cy, R, 0, Math.PI * 2);
+      radarCtx.stroke();
+
+      radarCtx.font = "bold 13px sans-serif";
+      radarCtx.fillStyle = "#e2e8f0";
+      radarCtx.textAlign = "center";
+      radarCtx.fillText("N (0°)", cx, cy - R - 10);
+      radarCtx.fillText("S (180°)", cx, cy + R + 20);
+      radarCtx.fillText("E (90°)", cx + R + 26, cy + 4);
+      radarCtx.fillText("W (270°)", cx - R - 28, cy + 4);
+      radarCtx.textAlign = "left";
+    }
+
+    /**
+     * ============================================================================
+     * 7. 캔버스 렌더링: (2) 도플러 효과 송·수신 전자기파 물리 시뮬레이터
+     * ============================================================================
+     */
+    const waveCanvas = document.getElementById("waveCanvas");
+    const waveCtx = waveCanvas.getContext("2d");
+
+    function renderWaveCanvas() {
+      const W = waveCanvas.width;
+      const H = waveCanvas.height;
+      const phys = calculateDopplerPhysics();
+
+      waveCtx.clearRect(0, 0, W, H);
+      waveCtx.fillStyle = "#040a16";
+      waveCtx.fillRect(0, 0, W, H);
+
+      // 상단 영역: 레이더 안테나 <-> 강수 입자 사이 전자기파 전파 및 반사 파장 변화
+      const topH = H * 0.56;
+      const radarX = 56;
+      const radarY = topH * 0.52;
+
+      // 입자 위치를 시선 상대속도에 따라 미세 왕복 또는 접근/후퇴 모션으로 표시
+      const motionOsc = Math.sin(state.wavePhase * 0.6) * 24;
+      const driftSign = phys.closingSpeed > 0.15 ? -1 : phys.closingSpeed < -0.15 ? 1 : 0;
+      const targetX = W - 115 + driftSign * motionOsc;
+      const targetY = radarY;
+
+      // 송신파 파장(시각화 픽셀 단위)
+      const baseLambdaPx = Math.max(18, Math.min(44, 95 / phys.f0GHz));
+      // 접근 시 파장 압축(간격 좁아짐), 후퇴 시 파장 신장(간격 넓어짐)
+      const shiftRatio = Math.max(-0.42, Math.min(0.42, phys.closingSpeed / 65));
+      const rxLambdaPx = baseLambdaPx * (1 - shiftRatio);
+
+      // 단계 하이라이트 업데이트
+      const activeStepIdx = Math.floor((state.wavePhase * 0.8) % 5) + 1;
+      for (let i = 1; i <= 5; i++) {
+        const el = document.getElementById(`step${i}`);
+        if (el) el.classList.toggle("active-step", i === activeStepIdx);
+      }
+
+      // 1) 송신파 (Tx: 레이더 -> 강수 입자, 상단 파선)
+      waveCtx.save();
+      waveCtx.strokeStyle = "#38bdf8";
+      waveCtx.lineWidth = 2;
+      waveCtx.beginPath();
+      for (let x = radarX + 18; x <= targetX - 18; x += 2) {
+        const dist = x - (radarX + 18);
+        const y = radarY - 22 + Math.sin((dist / baseLambdaPx) * Math.PI * 2 - state.wavePhase * 2.2) * 12;
+        if (x === radarX + 18) waveCtx.moveTo(x, y);
+        else waveCtx.lineTo(x, y);
+      }
+      waveCtx.stroke();
+      waveCtx.fillStyle = "#7dd3fc";
+      waveCtx.font = "11px sans-serif";
+      waveCtx.fillText(`송신파 Tx (f₀ = ${phys.f0GHz.toFixed(2)} GHz, λ = ${phys.lambdaCm.toFixed(2)} cm) ▶`, radarX + 24, radarY - 40);
+      waveCtx.restore();
+
+      // 2) 반사 수신파 (Rx: 강수 입자 -> 레이더, 하단 파선)
+      const rxColor = phys.closingSpeed > 0.15 ? "#4ade80" : phys.closingSpeed < -0.15 ? "#f87171" : "#cbd5e1";
+      waveCtx.save();
+      waveCtx.strokeStyle = rxColor;
+      waveCtx.lineWidth = 2.2;
+      waveCtx.beginPath();
+      for (let x = targetX - 18; x >= radarX + 18; x -= 2) {
+        const dist = (targetX - 18) - x;
+        const y = radarY + 24 + Math.sin((dist / rxLambdaPx) * Math.PI * 2 - state.wavePhase * 2.2) * 12;
+        if (x === targetX - 18) waveCtx.moveTo(x, y);
+        else waveCtx.lineTo(x, y);
+      }
+      waveCtx.stroke();
+      waveCtx.fillStyle = rxColor;
+      waveCtx.font = "11px sans-serif";
+      const spacingNote =
+        phys.closingSpeed > 0.15
+          ? "◀ 반사파 Rx: 입자 접근 → 파장 간격 좁아짐 (주파수 상승)"
+          : phys.closingSpeed < -0.15
+          ? "◀ 반사파 Rx: 입자 후퇴 → 파장 간격 넓어짐 (주파수 하강)"
+          : "◀ 반사파 Rx: 시선속도 0 → 송신파와 동일 간격";
+      waveCtx.fillText(spacingNote, radarX + 24, radarY + 52);
+      waveCtx.restore();
+
+      // 레이더 안테나 아이콘
+      waveCtx.fillStyle = "#0ea5e9";
+      waveCtx.beginPath();
+      waveCtx.arc(radarX, radarY, 14, 0, Math.PI * 2);
+      waveCtx.fill();
+      waveCtx.strokeStyle = "#e0f2fe";
+      waveCtx.lineWidth = 1.5;
+      waveCtx.stroke();
+      waveCtx.fillStyle = "#f8fafc";
+      waveCtx.font = "bold 11px sans-serif";
+      waveCtx.textAlign = "center";
+      waveCtx.fillText("레이더", radarX, radarY + 28);
+
+      // 움직이는 강수 입자(빗방울 군집) 아이콘
+      waveCtx.fillStyle = "rgba(56, 189, 248, 0.25)";
+      waveCtx.beginPath();
+      waveCtx.arc(targetX, targetY, 22, 0, Math.PI * 2);
+      waveCtx.fill();
+      waveCtx.strokeStyle = rxColor;
+      waveCtx.lineWidth = 1.8;
+      waveCtx.stroke();
+
+      // 작은 빗방울 점들
+      for (let k = -1; k <= 1; k++) {
+        waveCtx.fillStyle = "#e0f2fe";
+        waveCtx.beginPath();
+        waveCtx.arc(targetX + k * 6, targetY + (k % 2) * 5, 3, 0, Math.PI * 2);
+        waveCtx.fill();
+      }
+      waveCtx.fillStyle = "#f8fafc";
+      waveCtx.fillText("강수 입자", targetX, targetY + 35);
+      waveCtx.textAlign = "left";
+
+      // 구분선
+      waveCtx.strokeStyle = "rgba(148, 163, 184, 0.2)";
+      waveCtx.beginPath();
+      waveCtx.moveTo(14, topH);
+      waveCtx.lineTo(W - 14, topH);
+      waveCtx.stroke();
+
+      // 하단 영역: 송신 주파수(f0) vs 수신 주파수(frx) 파형 중첩 비교 오실로스코프
+      const scopeTop = topH + 10;
+      const scopeH = H - scopeTop - 12;
+      const scopeMidY = scopeTop + scopeH * 0.56;
+
+      waveCtx.fillStyle = "#94a3b8";
+      waveCtx.font = "11px sans-serif";
+      waveCtx.fillText(
+        `주파수 비교 오실로스코프: 송신 f₀(청록 점선) vs 수신 f_rx(실선) | Δf = ${phys.deltaFHz >= 0 ? "+" : ""}${phys.deltaFHz.toFixed(1)} Hz`,
+        16,
+        scopeTop + 12
+      );
+
+      const baseCycles = 8;
+      const rxCycles = baseCycles * (1 + shiftRatio * 0.45);
+
+      // 송신 기준 파형 (청록 점선)
+      waveCtx.save();
+      waveCtx.strokeStyle = "rgba(56, 189, 248, 0.65)";
+      waveCtx.setLineDash([4, 3]);
+      waveCtx.lineWidth = 1.5;
+      waveCtx.beginPath();
+      for (let x = 16; x <= W - 16; x += 2) {
+        const t = (x - 16) / (W - 32);
+        const y = scopeMidY + Math.sin(t * Math.PI * 2 * baseCycles - state.wavePhase * 2) * (scopeH * 0.28);
+        if (x === 16) waveCtx.moveTo(x, y);
+        else waveCtx.lineTo(x, y);
+      }
+      waveCtx.stroke();
+      waveCtx.restore();
+
+      // 수신 변조 파형 (초록/빨강 실선)
+      waveCtx.save();
+      waveCtx.strokeStyle = rxColor;
+      waveCtx.lineWidth = 2;
+      waveCtx.beginPath();
+      for (let x = 16; x <= W - 16; x += 2) {
+        const t = (x - 16) / (W - 32);
+        const y = scopeMidY + Math.sin(t * Math.PI * 2 * rxCycles - state.wavePhase * 2) * (scopeH * 0.28);
+        if (x === 16) waveCtx.moveTo(x, y);
+        else waveCtx.lineTo(x, y);
+      }
+      waveCtx.stroke();
+      waveCtx.restore();
+    }
+
+    /**
+     * ============================================================================
+     * 8. 캔버스 렌더링: (3) 시간에 따른 도플러 주파수 및 속도 그래프
+     * ============================================================================
+     */
+    const freqChartCanvas = document.getElementById("freqChartCanvas");
+    const freqChartCtx = freqChartCanvas.getContext("2d");
+    const velChartCanvas = document.getElementById("velChartCanvas");
+    const velChartCtx = velChartCanvas.getContext("2d");
+
+    function renderTimeSeriesCharts() {
+      // 1) 도플러 주파수 편이 Δf(t) 그래프
+      drawLineChart(freqChartCtx, freqChartCanvas.width, freqChartCanvas.height, {
+        title: "시간에 따른 도플러 주파수 변화 Δf (Hz)",
+        series: [
+          { data: state.freqHistory, color: "#2dd4bf", label: "Δf (Hz)" }
+        ],
+        zeroLine: true,
+        minSpan: 100
+      });
+
+      // 2) 전체 이동속도 |v| vs 레이더 시선속도 vr 비교 그래프
+      drawLineChart(velChartCtx, velChartCanvas.width, velChartCanvas.height, {
+        title: "전체 이동속도 |v| vs 레이더 시선속도 vr (m/s)",
+        series: [
+          { data: state.totalVelHistory, color: "#facc15", label: "|v|" },
+          { data: state.radialVelHistory, color: "#38bdf8", label: "vr" }
+        ],
+        zeroLine: true,
+        minSpan: 15
+      });
+    }
+
+    function drawLineChart(ctx, W, H, opts) {
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = "#040a16";
+      ctx.fillRect(0, 0, W, H);
+
+      const padL = 38;
+      const padR = 10;
+      const padT = 24;
+      const padB = 14;
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
+
+      ctx.fillStyle = "#cbd5e1";
+      ctx.font = "bold 10.5px sans-serif";
+      ctx.fillText(opts.title, 10, 14);
+
+      let maxVal = opts.minSpan;
+      let minVal = opts.zeroLine ? -opts.minSpan : 0;
+
+      for (const s of opts.series) {
+        for (const v of s.data) {
+          if (v > maxVal) maxVal = v * 1.15;
+          if (v < minVal) minVal = v * 1.15;
+        }
+      }
+
+      const range = Math.max(1e-3, maxVal - minVal);
+      const valToY = (v) => padT + plotH - ((v - minVal) / range) * plotH;
+
+      // 축 눈금
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.16)";
+      ctx.lineWidth = 1;
+      ctx.font = "9px monospace";
+      ctx.fillStyle = "#64748b";
+
+      const yTop = padT;
+      const yBot = padT + plotH;
+      ctx.beginPath();
+      ctx.moveTo(padL, yTop);
+      ctx.lineTo(W - padR, yTop);
+      ctx.moveTo(padL, yBot);
+      ctx.lineTo(W - padR, yBot);
+      ctx.stroke();
+
+      ctx.fillText(Math.round(maxVal), 4, yTop + 6);
+      ctx.fillText(Math.round(minVal), 4, yBot);
+
+      if (opts.zeroLine && minVal < 0 && maxVal > 0) {
+        const yZero = valToY(0);
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.35)";
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(padL, yZero);
+        ctx.lineTo(W - padR, yZero);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillText("0", 14, yZero + 3);
+      }
+
+      // 데이터 곡선
+      for (const s of opts.series) {
+        if (s.data.length < 2) continue;
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        s.data.forEach((v, idx) => {
+          const x = padL + (idx / Math.max(1, state.historyMaxLen - 1)) * plotW;
+          const y = valToY(v);
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 9. 사용자 입력 제어 및 양방향 슬라이더 바인딩
+     * ============================================================================
+     */
+    function setSimulationMode(mode) {
+      state.simMode = mode;
+      const btnW = document.getElementById("btnModeWeather");
+      const btnE = document.getElementById("btnModeExperiment");
+      const badge = document.getElementById("simModeBadge");
+      const badgeText = document.getElementById("simModeText");
+      const helper = document.getElementById("modeHelperText");
+
+      if (mode === "weather") {
+        btnW.classList.add("active");
+        btnE.classList.remove("active");
+        badge.className = "badge badge-sim";
+        badgeText.textContent = "기상정보 연동 모드";
+        helper.innerHTML = "현재 기상 데이터의 풍향·풍속이 강수 입자 운동에 자동 적용됩니다. 슬라이더를 조작하면 <strong>물리 실험 모드</strong>로 전환됩니다.";
+        syncWeatherToSimulation();
+      } else {
+        btnE.classList.add("active");
+        btnW.classList.remove("active");
+        badge.className = "badge badge-exp";
+        badgeText.textContent = "사용자 물리 실험 모드";
+        helper.innerHTML = "사용자가 설정한 물리 실험 변수가 적용 중입니다. 기상청 관측값으로 되돌리려면 <strong>기상 연동 모드</strong>를 누르세요.";
+      }
+    }
+
+    function syncControlsFromState() {
+      const p = state.physics;
+      document.getElementById("sliderSpeed").value = p.particleSpeed;
+      document.getElementById("numSpeed").value = p.particleSpeed;
+
+      document.getElementById("sliderMoveDir").value = p.moveDir;
+      document.getElementById("numMoveDir").value = p.moveDir;
+
+      document.getElementById("sliderFreq").value = p.freqGHz;
+      document.getElementById("numFreq").value = p.freqGHz;
+
+      document.getElementById("sliderMaxRange").value = p.maxRangeKm;
+      document.getElementById("numMaxRange").value = p.maxRangeKm;
+
+      document.getElementById("sliderCellRadius").value = p.cellRadiusKm;
+      document.getElementById("numCellRadius").value = p.cellRadiusKm;
+
+      document.getElementById("sliderCellDist").value = p.cellDistKm;
+      document.getElementById("numCellDist").value = p.cellDistKm;
+
+      document.getElementById("sliderCellAz").value = p.cellAzimuth;
+      document.getElementById("numCellAz").value = p.cellAzimuth;
+
+      document.getElementById("sliderRpm").value = p.radarRpm;
+      document.getElementById("numRpm").value = p.radarRpm;
+
+      const alpha = computeBeamAngle(p.moveDir, p.cellAzimuth);
+      p.relBeamAngle = alpha;
+      document.getElementById("sliderRelAngle").value = alpha;
+      document.getElementById("numRelAngle").value = alpha;
+    }
+
+    function bindPair(sliderId, numId, onUpdate) {
+      const slider = document.getElementById(sliderId);
+      const num = document.getElementById(numId);
+
+      slider.addEventListener("input", () => {
+        const val = parseFloat(slider.value);
+        num.value = val;
+        if (state.simMode !== "experiment") setSimulationMode("experiment");
+        onUpdate(val);
+        updatePhysicsDashboard();
+      });
+
+      num.addEventListener("change", () => {
+        let val = parseFloat(num.value);
+        const min = parseFloat(slider.min);
+        const max = parseFloat(slider.max);
+        if (isNaN(val)) val = parseFloat(slider.value);
+        val = Math.max(min, Math.min(max, val));
+        num.value = val;
+        slider.value = val;
+        if (state.simMode !== "experiment") setSimulationMode("experiment");
+        onUpdate(val);
+        updatePhysicsDashboard();
+      });
+    }
+
+    function initControls() {
+      bindPair("sliderSpeed", "numSpeed", (v) => {
+        state.physics.particleSpeed = v;
+      });
+
+      bindPair("sliderMoveDir", "numMoveDir", (v) => {
+        state.physics.moveDir = normalizeAngle(v);
+        const alpha = computeBeamAngle(state.physics.moveDir, state.physics.cellAzimuth);
+        state.physics.relBeamAngle = alpha;
+        document.getElementById("sliderRelAngle").value = alpha;
+        document.getElementById("numRelAngle").value = alpha;
+      });
+
+      bindPair("sliderFreq", "numFreq", (v) => {
+        state.physics.freqGHz = v;
+      });
+
+      bindPair("sliderMaxRange", "numMaxRange", (v) => {
+        state.physics.maxRangeKm = v;
+      });
+
+      bindPair("sliderCellRadius", "numCellRadius", (v) => {
+        state.physics.cellRadiusKm = v;
+      });
+
+      bindPair("sliderCellDist", "numCellDist", (v) => {
+        state.physics.cellDistKm = v;
+      });
+
+      bindPair("sliderCellAz", "numCellAz", (v) => {
+        state.physics.cellAzimuth = normalizeAngle(v);
+        const alpha = computeBeamAngle(state.physics.moveDir, state.physics.cellAzimuth);
+        state.physics.relBeamAngle = alpha;
+        document.getElementById("sliderRelAngle").value = alpha;
+        document.getElementById("numRelAngle").value = alpha;
+      });
+
+      bindPair("sliderRpm", "numRpm", (v) => {
+        state.physics.radarRpm = v;
+      });
+
+      // 입자 이동 방향과 레이더 시선 사이의 각도 α 조절 시 입자 이동 방향을 연동 갱신
+      bindPair("sliderRelAngle", "numRelAngle", (alpha) => {
+        state.physics.relBeamAngle = alpha;
+        const newMoveDir = normalizeAngle(state.physics.cellAzimuth + alpha);
+        state.physics.moveDir = newMoveDir;
+        document.getElementById("sliderMoveDir").value = newMoveDir;
+        document.getElementById("numMoveDir").value = newMoveDir;
+      });
+
+      // 주파수 밴드 프리셋 버튼
+      document.querySelectorAll(".preset-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const f = parseFloat(btn.dataset.freq);
+          state.physics.freqGHz = f;
+          document.getElementById("sliderFreq").value = f;
+          document.getElementById("numFreq").value = f;
+          if (state.simMode !== "experiment") setSimulationMode("experiment");
+          updatePhysicsDashboard();
+        });
+      });
+
+      // 모드 전환 버튼
+      document.getElementById("btnModeWeather").addEventListener("click", () => setSimulationMode("weather"));
+      document.getElementById("btnModeExperiment").addEventListener("click", () => setSimulationMode("experiment"));
+
+      // 레이더 화면 표시 모드 버튼
+      document.querySelectorAll(".mode-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".mode-btn").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          state.radarDisplayMode = btn.dataset.radarmode;
+
+          const isRef = state.radarDisplayMode === "reflectivity";
+          document.getElementById("legendVelocityBox").style.display = isRef ? "none" : "block";
+          document.getElementById("legendReflectivityBox").style.display = isRef ? "block" : "none";
+        });
+      });
+
+      // 재생 / 일시정지 / 초기화
+      document.getElementById("btnTogglePlay").addEventListener("click", () => {
+        state.isPlaying = !state.isPlaying;
+        document.getElementById("btnTogglePlay").textContent = state.isPlaying ? "⏸ 일시정지" : "▶ 재생";
+      });
+
+      document.getElementById("btnReset").addEventListener("click", () => {
+        state.physics.freqGHz = 2.8;
+        state.physics.maxRangeKm = 100;
+        state.physics.radarRpm = 4.0;
+        state.freqHistory = [];
+        state.totalVelHistory = [];
+        state.radialVelHistory = [];
+        setSimulationMode("weather");
+      });
+
+      document.getElementById("btnSyncWeatherToSim").addEventListener("click", () => {
+        setSimulationMode("weather");
+      });
+
+      document.getElementById("btnRefreshWeather").addEventListener("click", () => {
+        fetchWeatherForCurrentLocation();
+      });
+
+      // 레이더 캔버스 마우스/터치 드래그로 강수 영역 직접 이동
+      function getRadarPointerCoords(evt) {
+        const rect = radarCanvas.getBoundingClientRect();
+        const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+        const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+        const x = ((clientX - rect.left) / rect.width) * radarCanvas.width;
+        const y = ((clientY - rect.top) / rect.height) * radarCanvas.height;
+        const cx = radarCanvas.width / 2;
+        const cy = radarCanvas.height / 2;
+        const R = Math.min(radarCanvas.width, radarCanvas.height) * 0.43;
+        const dx = x - cx;
+        const dy = cy - y;
+        const distKm = Math.min(state.physics.maxRangeKm * 0.92, Math.max(5, (Math.hypot(dx, dy) / R) * state.physics.maxRangeKm));
+        const az = normalizeAngle(Math.round((Math.atan2(dx, dy) * 180) / Math.PI));
+        return { distKm: Math.round(distKm), az };
+      }
+
+      radarCanvas.addEventListener("pointerdown", (e) => {
+        state.isDraggingCell = true;
+        const pos = getRadarPointerCoords(e);
+        if (state.simMode !== "experiment") setSimulationMode("experiment");
+        state.physics.cellDistKm = pos.distKm;
+        state.physics.cellAzimuth = pos.az;
+        syncControlsFromState();
+        updatePhysicsDashboard();
+      });
+
+      radarCanvas.addEventListener("pointermove", (e) => {
+        const pos = getRadarPointerCoords(e);
+        document.getElementById("radarCursorInfo").textContent = `방위: ${pos.az}° | 거리: ${pos.distKm} km`;
+        if (!state.isDraggingCell) return;
+        state.physics.cellDistKm = pos.distKm;
+        state.physics.cellAzimuth = pos.az;
+        syncControlsFromState();
+        updatePhysicsDashboard();
+      });
+
+      window.addEventListener("pointerup", () => {
+        state.isDraggingCell = false;
+      });
+    }
+
+    /**
+     * ============================================================================
+     * 10. 과학적 설명 및 학습 모듈 (고등학교 물리학 vs 대학 전자기학·기상학)
+     * ============================================================================
+     */
+    const EDU_TOPICS = [
+      {
+        title: "1. 전자기파의 성질",
+        hs: "전자기파는 전기장과 자기장이 서로 수직으로 진동하며 공간을 퍼져 나가는 횡파로, 매질이 없어도 진공과 대기를 빛의 속도(c ≈ 3.0×10⁸ m/s)로 이동합니다. 기상 레이더는 라디오파·마이크로파 영역(수 GHz)의 전자기파를 사용합니다.",
+        univ: "기상 레이더는 대기 중 수증기·산소 분자에 의한 감쇠(Attenuation)를 최소화하면서 강수 입자 산란 효율을 확보하기 위해 S-밴드(2~4 GHz), C-밴드(4~8 GHz), X-밴드(8~12 GHz) 마이크로파를 활용합니다. 주파수가 높을수록 공간 분해능은 향상되나 호우 구역 투과 시 감쇠가 급격히 증가합니다.",
+        formula: "c = f₀ · λ ≈ 2.9979 × 10⁸ m/s"
+      },
+      {
+        title: "2. 전자기파의 반사 (후방 산란)",
+        hs: "레이더에서 발사된 전자기파가 공기 중의 빗방울이나 눈송이 같은 강수 입자에 부딪히면 전파의 일부가 사방으로 흩어지고, 그중 일부가 레이더 안테나 방향으로 되돌아옵니다. 강수 입자가 크고 많을수록 반사 신호가 강해집니다.",
+        univ: "파장 λ가 강수 입자 지름 D보다 훨씬 클 때(D ≪ λ) 레일리 산란(Rayleigh Scattering) 영역이 성립하며, 후방산란 단면적은 입자 지름의 6제곱에 비례하고 파장의 4제곱에 반비례합니다(σ ∝ D⁶ / λ⁴). 이를 적분한 레이더 반사도 인자 Z(mm⁶/m³)를 로그 스케일(dBZ = 10 log₁₀ Z)로 변환하여 강수 강도를 추정합니다.",
+        formula: "Z = ∫ N(D) D⁶ dD ,   dBZ = 10 log₁₀(Z / Z₀)"
+      },
+      {
+        title: "3. 도플러 효과 (Doppler Effect)",
+        hs: "파원이나 관측자가 움직일 때 관측되는 진동수가 변하는 현상입니다. 기상 레이더에서는 전자기파가 움직이는 강수 입자에 도달할 때 1차 편이가 일어나고, 입자가 움직이는 파원이 되어 전파를 반사할 때 2차 편이가 일어나므로 왕복 효과가 2배로 나타납니다.",
+        univ: "비상대론적 극한(v ≪ c)에서 송신파가 시선속도 v_r로 후퇴하는 입자에 도달할 때 입자 좌표계의 수신 주파수는 f' = f₀(1 - v_r/c)이며, 재방사된 반사파가 정지한 레이더에 수신될 때 f_rx = f'(1 - v_r/c) ≈ f₀(1 - 2v_r/c)가 됩니다. 따라서 왕복 도플러 주파수 편이는 Δf = -2v_r / λ로 주어집니다.",
+        formula: "Δf = 2v_r / λ   (접근 시 f_rx > f₀, 후퇴 시 f_rx < f₀)"
+      },
+      {
+        title: "4. 파장과 진동수의 관계",
+        hs: "전자기파의 속력 c가 일정하므로 파장(λ)과 진동수(f₀)는 서로 반비례합니다. 진동수가 큰 X-밴드(9.4 GHz)는 파장이 약 3.2 cm로 짧고, S-밴드(2.8 GHz)는 파장이 약 10.7 cm로 길어 같은 입자 속도에서도 X-밴드가 더 큰 도플러 주파수 편이를 만듭니다.",
+        univ: "펄스 도플러 레이더에서는 펄스 반복 주파수(PRF)에 의해 위상 모호성 없는 최대 측정 속도인 나이퀴스트 속도(v_max = ± λ·PRF / 4)가 결정됩니다. 파장 λ가 짧아지면 Δf 감도는 높아지지만 v_max가 작아져 강풍 시 속도 접힘(Velocity Folding)이 쉽게 발생합니다.",
+        formula: "λ = c / f₀ ,   v_max = ± (λ · PRF) / 4"
+      },
+      {
+        title: "5. 레이더 방향 속도(시선속도)와 실제 이동속도의 차이",
+        hs: "도플러 레이더는 강수 입자의 전체 이동속도(v)를 직접 재는 것이 아니라, 레이더 안테나를 향하거나 멀어지는 방향의 속도 성분인 '시선속도(v_r)'만 측정합니다. 입자가 레이더 시선과 직각(90°)으로 지나가면 실제로 빠르게 움직여도 시선속도와 도플러 편이는 0이 됩니다.",
+        univ: "3차원 바람 벡터 V = (u, v, w)와 안테나 방위각 φ, 고도각 θ_e에 대해 시선속도는 내적 v_r = V · r̂ = u sinφ cosθ_e + v cosφ cosθ_e + (w - w_t) sinθ_e로 표현됩니다. 균일 바람장에서도 방위각에 따라 cos(φ - φ₀) 패턴의 쌍극자(초록·빨강)와 0 등속선(Zero Isodop)이 형성됩니다.",
+        formula: "v_r = v · cos(α)   (α = 90°일 때 v_r = 0)"
+      },
+      {
+        title: "6. 도플러 기상 레이더의 관측 원리",
+        hs: "레이더 안테나가 360° 회전하면서 짧은 전자기파 펄스를 쏘고 반사파가 돌아오는 시간으로 강수 구름까지의 거리를 계산합니다. 동시에 반사파의 주파수·위상 변화를 분석해 바람이 레이더 쪽으로 불어오는지(초록색) 멀어지는지(빨간색) 지도로 그립니다.",
+        univ: "단일 펄스의 짧은 지속시간(~1 μs) 내에서는 미세한 Δf(수백 Hz)를 직접 분해하기 어려우므로, 연속된 펄스 쌍(Pulse-Pair) 사이의 복소 자기상관함수 R(T_s)로부터 위상 변화량 Δφ = 4π v_r T_s / λ를 추출하여 시선속도를 정밀 산출합니다.",
+        formula: "거리 R = (c · Δt) / 2 ,   v_r = (λ · Δφ) / (4π T_s)"
+      },
+      {
+        title: "7. 강수 입자의 이동과 바람의 관계",
+        hs: "공기 중에 떠 있거나 낙하하는 작은 빗방울과 눈송이는 수평 방향으로 주변 바람에 실려 함께 이동합니다. 따라서 강수 입자의 수평 이동 속도와 방향을 측정하면 구름 내부의 바람장(돌풍, 회전, 전선 등)을 파악할 수 있습니다.",
+        univ: "수상체의 관성 완화 시간(Relaxation Time)은 수십 밀리초 수준으로 매우 짧아 수평 풍속에 즉각 동조합니다. 다만 연직 방향으로는 중력에 의한 종단낙하속도(w_t, 빗방울 약 4~9 m/s)가 존재하므로 고도각이 높을수록 시선속도에서 w_t sinθ_e 보정이 필요합니다.",
+        formula: "V_particle,horizontal ≈ V_wind"
+      },
+      {
+        title: "8. 실제 기상 레이더의 한계",
+        hs: "실제 기상 레이더는 하나의 빗방울이 아니라 빔 폭 안에 들어 있는 수백만 개의 강수 입자에서 반사된 신호를 평균하여 분석합니다. 또한 높은 산에 전파가 가려지거나, 지표면·건물 반사(클러터), 지구 둥글기로 인한 원거리 고도 상승 등의 한계가 있습니다.",
+        univ: "펄스 체적(Pulse Volume) 내 입자들의 속도 분산은 스펙트럼 폭(Spectrum Width, σ_v)으로 나타나며 난류와 윈드시어의 지표가 됩니다. 또한 최대 탐지 거리(R_max = c / 2PRF)와 나이퀴스트 속도(v_max)가 반비례하는 '도플러 딜레마(Range-Velocity Ambiguity)'를 이중 PRF 기법 등으로 완화합니다.",
+        formula: "R_max · v_max = (c · λ) / 8   (도플러 딜레마)"
+      }
+    ];
+
+    function renderEduCards() {
+      const container = document.getElementById("eduCardsContainer");
+      container.innerHTML = "";
+      for (const item of EDU_TOPICS) {
+        const card = document.createElement("div");
+        card.className = "edu-card";
+        const bodyText = state.eduLevel === "hs" ? item.hs : item.univ;
+        card.innerHTML = `
+          <h3>${item.title}</h3>
+          <p>${bodyText}</p>
+          <div class="edu-formula">${item.formula}</div>
+        `;
+        container.appendChild(card);
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 11. 탭 전환 및 모달(위치 동의 / 기상청 API 설정) 이벤트 초기화
+     * ============================================================================
+     */
+    function initModalsAndTabs() {
+      // 상단 탭 전환
+      document.querySelectorAll(".nav-tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document.querySelectorAll(".nav-tab").forEach((t) => t.classList.remove("active"));
+          document.querySelectorAll(".tab-section").forEach((s) => s.classList.remove("active"));
+          tab.classList.add("active");
+          document.getElementById(tab.dataset.tab).classList.add("active");
+        });
+      });
+
+      // 학습 모듈 수준 전환
+      document.getElementById("btnLevelHS").addEventListener("click", () => {
+        state.eduLevel = "hs";
+        document.getElementById("btnLevelHS").classList.add("active");
+        document.getElementById("btnLevelUniv").classList.remove("active");
+        renderEduCards();
+      });
+
+      document.getElementById("btnLevelUniv").addEventListener("click", () => {
+        state.eduLevel = "univ";
+        document.getElementById("btnLevelUniv").classList.add("active");
+        document.getElementById("btnLevelHS").classList.remove("active");
+        renderEduCards();
+      });
+
+      // 시·군·구 드롭다운 채우기
+      const regionSelect = document.getElementById("regionSelect");
+      KOREA_REGIONS.forEach((r, idx) => {
+        const opt = document.createElement("option");
+        opt.value = idx;
+        opt.textContent = `${r.name} (${r.lat.toFixed(2)}°N, ${r.lon.toFixed(2)}°E)`;
+        regionSelect.appendChild(opt);
+      });
+
+      regionSelect.addEventListener("change", () => {
+        const r = KOREA_REGIONS[Number(regionSelect.value)];
+        if (r) {
+          document.getElementById("inputLat").value = r.lat;
+          document.getElementById("inputLon").value = r.lon;
+        }
+      });
+
+      // 위치정보 모달 열기/닫기
+      const locModal = document.getElementById("locationModal");
+      document.getElementById("btnOpenLocation").addEventListener("click", () => {
+        locModal.classList.add("open");
+      });
+
+      // 브라우저 Geolocation 동의 및 위치 확인
+      document.getElementById("btnAgreeGeo").addEventListener("click", () => {
+        const msgEl = document.getElementById("geoStatusMsg");
+        if (!navigator.geolocation) {
+          msgEl.textContent = "이 브라우저는 위치정보(Geolocation) API를 지원하지 않습니다. 아래에서 시·군·구를 선택해 주세요.";
+          return;
+        }
+        msgEl.textContent = "브라우저 위치정보를 확인하는 중입니다...";
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            const matched = findNearestSiGunGu(lat, lon);
+            state.lat = lat;
+            state.lon = lon;
+            state.regionName = matched.name;
+            msgEl.textContent = `확인 완료: ${matched.name} 부근 좌표가 적용되었습니다.`;
+            locModal.classList.remove("open");
+            fetchWeatherForCurrentLocation();
+          },
+          (err) => {
+            msgEl.textContent = `위치정보 제공이 거부되었거나 확인할 수 없습니다(${err.message}). 아래에서 시·군·구 또는 위·경도를 선택해 주세요.`;
+          },
+          { enableHighAccuracy: false, timeout: 7000 }
+        );
+      });
+
+      // 수동 지역/좌표 적용
+      document.getElementById("btnApplyManualLocation").addEventListener("click", () => {
+        const lat = parseFloat(document.getElementById("inputLat").value);
+        const lon = parseFloat(document.getElementById("inputLon").value);
+        if (isNaN(lat) || isNaN(lon)) return;
+        const matched = findNearestSiGunGu(lat, lon);
+        state.lat = lat;
+        state.lon = lon;
+        state.regionName = matched.name;
+        locModal.classList.remove("open");
+        fetchWeatherForCurrentLocation();
+      });
+
+      // 기상청 API 설정 모달
+      const apiModal = document.getElementById("apiModal");
+      document.getElementById("btnOpenApi").addEventListener("click", () => {
+        document.getElementById("kmaApiKeyInput").value = state.kmaApiKey;
+        apiModal.classList.add("open");
+      });
+
+      document.getElementById("btnCloseApiModal").addEventListener("click", () => {
+        apiModal.classList.remove("open");
+      });
+
+      document.getElementById("btnSaveApiKey").addEventListener("click", () => {
+        const key = document.getElementById("kmaApiKeyInput").value.trim();
+        state.kmaApiKey = key;
+        if (key) localStorage.setItem("kma_doppler_api_key", key);
+        else localStorage.removeItem("kma_doppler_api_key");
+        apiModal.classList.remove("open");
+        fetchWeatherForCurrentLocation();
+      });
+
+      document.getElementById("btnClearApiKey").addEventListener("click", () => {
+        state.kmaApiKey = "";
+        document.getElementById("kmaApiKeyInput").value = "";
+        localStorage.removeItem("kma_doppler_api_key");
+        apiModal.classList.remove("open");
+        fetchWeatherForCurrentLocation();
+      });
+    }
+
+    /**
+     * ============================================================================
+     * 12. 메인 애니메이션 루프 및 초기화
+     * ============================================================================
+     */
+    function animationLoop(now) {
+      const dt = Math.min(0.08, (now - state.lastFrameTime) / 1000);
+      state.lastFrameTime = now;
+
+      if (state.isPlaying) {
+        stepSimulation(dt);
+      }
+
+      renderRadarCanvas();
+      renderWaveCanvas();
+      renderTimeSeriesCharts();
+
+      requestAnimationFrame(animationLoop);
+    }
+
+    function initApp() {
+      initModalsAndTabs();
+      initControls();
+      renderEduCards();
+      rebuildParticles();
+
+      // 초기 데모 기상정보 로드 (모달에서 사용자 동의/선택 시 즉시 갱신됨)
+      applyDemoWeather(KOREA_REGIONS[0].demo, "데모 모드 (위치 선택 및 기상청 API 설정 대기)");
+      syncControlsFromState();
+      updatePhysicsDashboard();
+
+      requestAnimationFrame(animationLoop);
+    }
+
+    window.addEventListener("DOMContentLoaded", initApp);
+  </script>
+</body>
+</html>
